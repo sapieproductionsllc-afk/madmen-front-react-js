@@ -131,7 +131,7 @@ export default function SideNav({ open, onClose }) {
 
         {/* Bloc d'aide / scan rapide */}
         <div className="px-1 pt-5">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-indigo-900 p-4 text-canvas shadow-card">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-4 text-canvas shadow-glow">
             {/* Halo décoratif discret */}
             <span
               aria-hidden="true"
