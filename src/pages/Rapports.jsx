@@ -123,7 +123,7 @@ export default function Rapports() {
                   <div className="border-t border-border" />
                   <div className="border-t border-border" />
                 </div>
-                <AreaChart data={d.serie} height={150} color="#4f46e5" id={`rapport-${periode}`} dots />
+                <AreaChart data={d.serie} height={150} color="#f4c430" id={`rapport-${periode}`} dots />
               </div>
               <div className="flex justify-between text-[10px] text-subtle mt-2">
                 {d.xLabels.map((l) => (

@@ -144,10 +144,10 @@ export default function SideNav({ open, onClose }) {
                 </span>
                 <span className="text-sm font-semibold tracking-tight">Scan rapide</span>
               </div>
-              <p className="text-xs text-white/70 leading-relaxed mb-3.5">
+              <p className="text-xs text-canvas/70 leading-relaxed mb-3.5">
                 Pointez un employé via son badge ou son empreinte.
               </p>
-              <button className="w-full bg-white/15 hover:bg-white/25 active:translate-y-px text-canvas text-xs font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5">
+              <button className="w-full bg-canvas/15 hover:bg-canvas/25 active:translate-y-px text-canvas text-xs font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5">
                 <Icon name="bolt" className="text-[16px]" filled />
                 Lancer un scan
               </button>

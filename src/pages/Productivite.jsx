@@ -34,7 +34,7 @@ export default function Productivite() {
               {productivity.weeklyGrowth} %
             </span>
           </div>
-          <AreaChart data={productivity.series} height={150} id="prodpage" color="#4f46e5" />
+          <AreaChart data={productivity.series} height={150} id="prodpage" color="#f4c430" />
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
           <StatTile icon="schedule" label="Temps travaillé moyen" value="6h 45m" color="indigo" />
