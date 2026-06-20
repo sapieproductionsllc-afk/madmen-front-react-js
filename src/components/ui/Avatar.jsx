@@ -2,12 +2,12 @@ import { useState } from "react";
 
 // Couleurs d'avatar (initiales) déterministes selon le nom.
 const couleurs = [
-  "bg-brand-500/15 text-brand-400",
-  "bg-emerald-500/15 text-emerald-300",
-  "bg-amber-500/15 text-amber-300",
-  "bg-rose-500/15 text-rose-300",
-  "bg-sky-500/15 text-sky-300",
-  "bg-violet-500/15 text-violet-300",
+  "bg-brand-50 text-brand-600",
+  "bg-emerald-50 text-emerald-700",
+  "bg-amber-50 text-amber-700",
+  "bg-rose-50 text-rose-700",
+  "bg-sky-50 text-sky-700",
+  "bg-slate-50 text-slate-700",
 ];
 
 export default function Avatar({ src, name = "", size = "w-9 h-9", className = "" }) {

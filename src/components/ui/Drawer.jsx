@@ -1,17 +1,21 @@
 import { useEffect, useId, useRef } from "react";
 import Icon from "./Icon.jsx";
 
-const widths = {
-  sm: "max-w-md",
-  md: "max-w-lg",
-  lg: "max-w-2xl",
-  xl: "max-w-4xl",
-};
-
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function Modal({ open, onClose, title, subtitle, icon, iconTone = "brand", children, footer, size = "md" }) {
+// Panneau latéral coulissant (droite) — pour consulter le détail d'un élément
+// sans quitter la liste. Accessibilité alignée sur Modal (Échap, scroll-lock, focus-trap).
+export default function Drawer({
+  open,
+  onClose,
+  title,
+  subtitle,
+  icon,
+  iconClass = "bg-brand-50 text-brand-600",
+  children,
+  footer,
+}) {
   const panelRef = useRef(null);
   const closeRef = useRef(null);
   const previousFocus = useRef(null);
@@ -29,20 +33,18 @@ export default function Modal({ open, onClose, title, subtitle, icon, iconTone =
     return () => {
       window.removeEventListener("keydown", handler);
       document.body.style.overflow = "";
-      // Restaure le focus sur l'élément déclencheur à la fermeture.
       if (previousFocus.current instanceof HTMLElement) previousFocus.current.focus();
     };
   }, [open, onClose]);
 
-  // À l'ouverture : place le focus sur le premier élément interactif (ou le bouton Fermer).
+  // À l'ouverture : focus sur le premier élément interactif (ou Fermer).
   useEffect(() => {
     if (!open) return;
-    const panel = panelRef.current;
-    const first = panel?.querySelector(FOCUSABLE);
+    const first = panelRef.current?.querySelector(FOCUSABLE);
     (first || closeRef.current)?.focus();
   }, [open]);
 
-  // Piège le focus dans le panneau (boucle Tab / Shift+Tab).
+  // Piège le focus dans le panneau.
   const onKeyDownTrap = (e) => {
     if (e.key !== "Tab") return;
     const panel = panelRef.current;
@@ -64,11 +66,9 @@ export default function Modal({ open, onClose, title, subtitle, icon, iconTone =
 
   if (!open) return null;
 
-  const tone = iconTone === "danger" ? "bg-rose-50 text-rose-600" : "bg-brand-50 text-brand-600";
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[60]">
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm overlay-in" onClick={onClose} />
       <div
         ref={panelRef}
         role="dialog"
@@ -76,16 +76,16 @@ export default function Modal({ open, onClose, title, subtitle, icon, iconTone =
         aria-labelledby={titleId}
         aria-describedby={subtitle ? subtitleId : undefined}
         onKeyDown={onKeyDownTrap}
-        className={`relative w-full ${widths[size]} bg-surface border border-border rounded-t-2xl sm:rounded-2xl shadow-pop max-h-[92vh] flex flex-col modal-in`}
+        className="absolute right-0 top-0 bottom-0 w-full max-w-[440px] bg-surface border-l border-border shadow-pop flex flex-col drawer-in"
       >
         <div className="flex items-start gap-3 p-5 border-b border-border">
           {icon && (
-            <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${tone}`}>
-              <Icon name={icon} className="text-[22px]" />
+            <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconClass}`}>
+              <Icon name={icon} className="text-[22px]" filled />
             </span>
           )}
           <div className="flex-1 min-w-0">
-            <h3 id={titleId} className="text-[1.0625rem] font-semibold text-ink tracking-tight">{title}</h3>
+            <h3 id={titleId} className="text-[1.0625rem] font-semibold text-ink tracking-tight truncate">{title}</h3>
             {subtitle && <p id={subtitleId} className="text-sm text-muted mt-0.5">{subtitle}</p>}
           </div>
           <button
@@ -98,12 +98,10 @@ export default function Modal({ open, onClose, title, subtitle, icon, iconTone =
           </button>
         </div>
 
-        <div className="p-5 overflow-y-auto scroll-thin">{children}</div>
+        <div className="flex-1 p-5 overflow-y-auto scroll-thin">{children}</div>
 
         {footer && (
-          <div className="flex flex-wrap justify-end gap-2 p-4 border-t border-border bg-surface-2 rounded-b-2xl">
-            {footer}
-          </div>
+          <div className="flex flex-wrap justify-end gap-2 p-4 border-t border-border bg-surface-2">{footer}</div>
         )}
       </div>
     </div>

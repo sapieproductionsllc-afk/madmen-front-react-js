@@ -107,5 +107,17 @@ export const rapports = [
 export const agencesList = ["Siège Social", "Agence Centre", "Agence Nord", "Agence Sud", "Agence Est"];
 export const statutsEmploye = ["Actif", "Congé", "Suspendu"];
 
+// Demandes en attente d'accord (congé / permission / justification d'absence) — liées par matricule.
+export const demandes = [
+  { id: "DM-201", employeId: "AUR-2241", type: "Congé", periode: "24 → 28 juin 2026", jours: 5, motif: "Congés payés annuels", soumisLe: "18 juin 2026" },
+  { id: "DM-202", employeId: "AUR-3398", type: "Permission", periode: "23 juin 2026 · 14:00 → 16:00", motif: "Rendez-vous médical", soumisLe: "19 juin 2026" },
+  { id: "DM-203", employeId: "AUR-9031", type: "Absence", periode: "20 juin 2026", motif: "Absence non justifiée à l'ouverture", soumisLe: "20 juin 2026" },
+  { id: "DM-204", employeId: "AUR-7012", type: "Congé", periode: "1 → 12 juillet 2026", jours: 10, motif: "Congé d'été", soumisLe: "15 juin 2026" },
+  { id: "DM-205", employeId: "AUR-1102", type: "Permission", periode: "25 juin 2026 · matin", motif: "Démarche administrative", soumisLe: "19 juin 2026" },
+];
+
+// Index rapide matricule → demande en attente.
+export const demandeParEmploye = Object.fromEntries(demandes.map((d) => [d.employeId, d]));
+
 // Source unique du compteur d'alertes (utilisé par le menu latéral ET le header)
 export const alertesNonLues = alertes.filter((a) => !a.read).length;

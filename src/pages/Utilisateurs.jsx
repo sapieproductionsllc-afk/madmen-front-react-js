@@ -42,7 +42,7 @@ export default function Utilisateurs() {
       label: "",
       align: "right",
       render: (u) => (
-        <button onClick={() => suspendre(u)} className="text-subtle hover:text-rose-400 hover:bg-rose-500/15 rounded-lg p-1.5 transition-colors" title="Suspendre l'accès">
+        <button onClick={() => suspendre(u)} className="text-subtle hover:text-rose-600 hover:bg-rose-50 rounded-lg p-1.5 transition-colors" title="Suspendre l'accès">
           <Icon name="block" className="text-[18px]" />
         </button>
       ),

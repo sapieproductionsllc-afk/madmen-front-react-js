@@ -33,17 +33,17 @@ export default function Finance() {
   const colonnes = [
     { key: "name", label: "Employé", render: (p) => <span className="font-medium text-ink">{p.name}</span> },
     { key: "base", label: "Salaire de base", align: "right", render: (p) => <span className="font-mono">{masque(euro(p.base))}</span> },
-    { key: "primes", label: "Primes", align: "right", render: (p) => <span className="font-mono text-emerald-400">{masque(euro(p.primes))}</span> },
-    { key: "avances", label: "Avances", align: "right", render: (p) => <span className="font-mono text-amber-400">{masque(p.avances ? `- ${euro(p.avances)}` : euro(0))}</span> },
+    { key: "primes", label: "Primes", align: "right", render: (p) => <span className="font-mono text-emerald-600">{masque(euro(p.primes))}</span> },
+    { key: "avances", label: "Avances", align: "right", render: (p) => <span className="font-mono text-amber-600">{masque(p.avances ? `- ${euro(p.avances)}` : euro(0))}</span> },
     {
       key: "retenues",
       label: "Retenues",
       align: "right",
       render: (p) => (
         <div className="flex flex-col items-end gap-0.5">
-          <span className="font-mono text-rose-400">{masque(`- ${euro(p.retenues)}`)}</span>
+          <span className="font-mono text-rose-600">{masque(`- ${euro(p.retenues)}`)}</span>
           {p.retardRetenue > 0 && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded">
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
               <Icon name="schedule" className="text-[12px]" />
               dont {masque(euro(p.retardRetenue))} retard
             </span>

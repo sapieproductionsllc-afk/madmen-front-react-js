@@ -29,12 +29,12 @@ export default function PagePlaceholder({
             Bientôt disponible
           </span>
           {role && (
-            <span className="px-2.5 py-1 rounded-full bg-slate-500/15 text-slate-400 text-xs font-medium">
+            <span className="px-2.5 py-1 rounded-full bg-slate-50 text-slate-600 text-xs font-medium">
               Accès : {role}
             </span>
           )}
           {sensible && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-400 text-xs font-medium">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 text-xs font-medium">
               <Icon name="lock" className="text-[14px]" /> Données sensibles
             </span>
           )}
@@ -44,7 +44,7 @@ export default function PagePlaceholder({
         <ul className="grid sm:grid-cols-2 gap-3">
           {sections.map((s) => (
             <li key={s} className="flex items-start gap-2.5 text-sm text-texte">
-              <Icon name="check_circle" className="text-emerald-400 text-[18px] mt-0.5 shrink-0" filled />
+              <Icon name="check_circle" className="text-emerald-600 text-[18px] mt-0.5 shrink-0" filled />
               {s}
             </li>
           ))}

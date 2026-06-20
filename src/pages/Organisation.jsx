@@ -60,7 +60,7 @@ export default function Organisation() {
                   </div>
                   <div className="rounded-xl bg-surface-2 p-3">
                     <p className="text-xs text-subtle">Présence</p>
-                    <p className="text-lg font-semibold text-emerald-400 tabular-nums">{taux} %</p>
+                    <p className="text-lg font-semibold text-emerald-600 tabular-nums">{taux} %</p>
                   </div>
                 </div>
               </div>

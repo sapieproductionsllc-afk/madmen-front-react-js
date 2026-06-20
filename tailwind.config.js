@@ -1,39 +1,41 @@
 /** @type {import('tailwindcss').Config} */
-// MADMEN — "Noir & Or" : socle de tokens premium, thème sombre executive.
-// Fond noir profond, surfaces graphite, accent or signature (#F4C430). Abandon de l'indigo.
+// MADMEN — "Crème & Canard" : identité officielle de la marque.
+// Fond crème, accent bleu canard (#1A535C), taupe secondaire (#D2BE9B), texte anthracite (#1E1E1E).
 export default {
   darkMode: "class",
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        // Accent de marque (OR) — CTA, nav active, liens, focus, données clés.
-        // brand-600 = or signature (#F4C430). Échelle pensée pour fond sombre.
+        // Accent de marque — BLEU CANARD officiel. brand-600 = #1A535C (CTA, nav active, liens, focus).
         brand: {
-          50: "#1a1710",
-          100: "#2a2513",
-          200: "#3f3719",
-          300: "#6b581f",
-          400: "#c9a227",
-          500: "#f6ce4d",
-          600: "#f4c430", // or signature — CTA / accents
-          700: "#d9a521", // hover CTA
-          800: "#a87e18",
-          900: "#6e520f",
+          50: "#e9f1f2",
+          100: "#cfe0e2",
+          200: "#a6c6ca",
+          300: "#73a4ab",
+          400: "#458088",
+          500: "#266b75",
+          600: "#1a535c", // bleu canard signature
+          700: "#143f47", // hover / pressé
+          800: "#0f3036",
+          900: "#0a2226",
         },
-        // Surfaces & fond app (noir → graphite)
-        canvas: "#0f0f10", // fond application
-        surface: "#1d1d1d", // cartes / panneaux
-        "surface-2": "#262626", // surfaces surélevées / hover
-        // Bordures (mappées sur les variables CSS pour cohérence)
+        // Surfaces & fond
+        canvas: "#f7f4e9", // crème (fond général)
+        surface: "#ffffff", // cartes / panneaux
+        "surface-2": "#f0ead9", // surfaces surélevées / hover / en-têtes doux
+        // Taupe officiel (accents chauds : en-têtes de tableau, blocs secondaires, badges)
+        sand: "#d2be9b",
+        "sand-soft": "#e7dcc4",
+        // Bordures (mappées sur variables CSS)
         border: "var(--border)",
         "border-strong": "var(--border-strong)",
-        // Échelle d'encre / texte (inversée pour le dark : clair sur sombre)
-        ink: "#fafafa", // titres / texte fort
-        texte: "#ededed", // texte courant
-        muted: "#9a9a9a", // texte secondaire
-        subtle: "#6f6f6f", // labels / placeholders
-        faint: "#4a4a4a", // texte très discret / séparateurs
+        // Échelle d'encre / texte (anthracite chaud)
+        ink: "#1e1e1e", // titres / texte fort
+        texte: "#33312c", // texte courant
+        muted: "#6e685c", // secondaire
+        subtle: "#938b7a", // labels / placeholders
+        faint: "#b9af9a", // discret / séparateurs
       },
       fontFamily: {
         sans: ["Geist", "system-ui", "-apple-system", "sans-serif"],
@@ -43,20 +45,20 @@ export default {
         kicker: "0.12em",
       },
       borderRadius: {
-        lg: "0.625rem", // 10px — boutons & inputs
-        xl: "0.75rem", // 12px — pastilles d'icône
-        "2xl": "1rem", // 16px — cartes
+        lg: "0.625rem",
+        xl: "0.75rem",
+        "2xl": "1rem",
       },
       maxWidth: {
         content: "1440px",
       },
       boxShadow: {
-        soft: "0 1px 2px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.5)",
-        card: "0 1px 2px rgba(0,0,0,0.45), 0 8px 24px -8px rgba(0,0,0,0.6)",
-        lift: "0 12px 32px -10px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5)",
-        pop: "0 24px 60px -16px rgba(0,0,0,0.75)",
-        focus: "0 0 0 3px rgba(244,196,48,0.30)",
-        glow: "0 0 0 1px rgba(244,196,48,0.25), 0 8px 28px -8px rgba(244,196,48,0.25)",
+        soft: "0 1px 2px rgba(30,30,30,0.04), 0 1px 3px rgba(30,30,30,0.06)",
+        card: "0 1px 2px rgba(30,30,30,0.04), 0 4px 16px -6px rgba(30,30,30,0.08)",
+        lift: "0 12px 28px -10px rgba(26,83,92,0.20), 0 2px 8px rgba(30,30,30,0.06)",
+        pop: "0 20px 50px -16px rgba(30,30,30,0.22)",
+        focus: "0 0 0 3px rgba(26,83,92,0.22)",
+        glow: "0 0 0 1px rgba(26,83,92,0.18), 0 10px 30px -8px rgba(26,83,92,0.22)",
       },
     },
   },

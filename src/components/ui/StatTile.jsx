@@ -1,13 +1,13 @@
 import Icon from "./Icon.jsx";
 
 const chips = {
-  indigo: "bg-brand-500/15 text-brand-400",
-  emerald: "bg-emerald-500/15 text-emerald-400",
-  violet: "bg-violet-500/15 text-violet-400",
-  rose: "bg-rose-500/15 text-rose-400",
-  amber: "bg-amber-500/15 text-amber-400",
-  sky: "bg-sky-500/15 text-sky-400",
-  slate: "bg-slate-500/15 text-slate-400",
+  indigo: "bg-brand-50 text-brand-600",
+  emerald: "bg-emerald-50 text-emerald-600",
+  violet: "bg-brand-50 text-brand-600",
+  rose: "bg-rose-50 text-rose-600",
+  amber: "bg-amber-50 text-amber-600",
+  sky: "bg-sky-50 text-sky-600",
+  slate: "bg-slate-50 text-slate-600",
 };
 
 // Petite tuile de statistique (haut de page).

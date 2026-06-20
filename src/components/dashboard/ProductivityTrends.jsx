@@ -16,7 +16,7 @@ export default function ProductivityTrends() {
               {anime.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
               <span className="text-2xl text-faint font-medium"> %</span>
             </span>
-            <span className="mb-1 inline-flex items-center gap-0.5 pl-1.5 pr-2 py-0.5 rounded-full text-xs font-semibold tabular-nums bg-emerald-500/10 text-emerald-700">
+            <span className="mb-1 inline-flex items-center gap-0.5 pl-1.5 pr-2 py-0.5 rounded-full text-xs font-semibold tabular-nums bg-emerald-50 text-emerald-600">
               <Icon name="arrow_upward" className="text-[14px]" />
               {productivity.weeklyGrowth} %
             </span>
@@ -31,7 +31,7 @@ export default function ProductivityTrends() {
       </div>
 
       {/* Courbe lissée sur 12 jours */}
-      <AreaChart data={productivity.series} height={128} id="prod" color="#f4c430" />
+      <AreaChart data={productivity.series} height={128} id="prod" color="#1a535c" />
 
       <div className="grid grid-cols-2 gap-3 mt-5">
         <div className="rounded-xl bg-surface-2 border border-border p-3.5">

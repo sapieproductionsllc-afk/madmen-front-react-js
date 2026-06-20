@@ -1,11 +1,11 @@
 const map = {
-  emerald: ["bg-emerald-400/10 text-emerald-400", "bg-emerald-500"],
-  amber: ["bg-amber-400/10 text-amber-400", "bg-amber-500"],
-  rose: ["bg-rose-400/10 text-rose-400", "bg-rose-500"],
-  slate: ["bg-slate-400/10 text-slate-400", "bg-slate-400"],
-  indigo: ["bg-brand-500/10 text-brand-400", "bg-brand-500"],
-  sky: ["bg-sky-400/10 text-sky-400", "bg-sky-500"],
-  violet: ["bg-violet-400/10 text-violet-400", "bg-violet-500"],
+  emerald: ["bg-emerald-50 text-emerald-600", "bg-emerald-500"],
+  amber: ["bg-amber-50 text-amber-600", "bg-amber-500"],
+  rose: ["bg-rose-50 text-rose-600", "bg-rose-500"],
+  slate: ["bg-slate-50 text-slate-600", "bg-slate-400"],
+  indigo: ["bg-brand-50 text-brand-600", "bg-brand-500"],
+  sky: ["bg-sky-50 text-sky-600", "bg-sky-500"],
+  violet: ["bg-brand-50 text-brand-600", "bg-brand-500"],
 };
 
 export default function StatusPill({ label, tone = "slate", dot = true }) {

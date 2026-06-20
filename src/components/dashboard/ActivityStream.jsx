@@ -56,7 +56,7 @@ function StatutActivite({ status }) {
   const config = {
     Actif: { color: "text-emerald-500", text: "text-texte", live: true },
     Inactif: { color: "text-amber-500", text: "text-muted", live: false },
-    Incident: { color: "text-rose-500", text: "text-rose-400 font-medium", live: false },
+    Incident: { color: "text-rose-500", text: "text-rose-600 font-medium", live: false },
   };
   const c = config[status] ?? config.Inactif;
   return (
@@ -122,7 +122,7 @@ export default function ActivityStream() {
               key={app}
               className={`px-2 py-0.5 rounded-md text-[11px] font-medium whitespace-nowrap border ${
                 l.status === "Incident"
-                  ? "bg-rose-400/10 border-rose-400/30 text-rose-400"
+                  ? "bg-rose-50 border-rose-200 text-rose-600"
                   : "bg-surface-2 border-border text-muted"
               }`}
             >
@@ -138,7 +138,7 @@ export default function ActivityStream() {
       render: (l) => (
         <span
           className={`text-sm font-mono tabular-nums whitespace-nowrap ${
-            l.status === "Incident" ? "text-rose-400 font-semibold" : "text-texte"
+            l.status === "Incident" ? "text-rose-600 font-semibold" : "text-texte"
           }`}
         >
           {l.worked}

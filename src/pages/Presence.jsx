@@ -15,9 +15,9 @@ const tone = { Présent: "emerald", Retard: "amber", Absent: "rose", Congé: "sl
 
 function CelluleRetard({ p }) {
   if (p.retardMin === null) return <span className="text-subtle">—</span>;
-  if (p.retardMin === 0) return <span className="text-emerald-400 text-xs font-medium">À l'heure</span>;
+  if (p.retardMin === 0) return <span className="text-emerald-600 text-xs font-medium">À l'heure</span>;
   if (p.retardMin <= 5) return <span className="text-muted text-xs">+{p.retardMin} min (toléré)</span>;
-  return <span className="text-amber-400 text-xs font-semibold">+{p.retardMin} min</span>;
+  return <span className="text-amber-600 text-xs font-semibold">+{p.retardMin} min</span>;
 }
 
 function CelluleJustif({ p }) {
@@ -79,7 +79,7 @@ export default function Presence() {
       align: "right",
       render: (p) =>
         p.retenue > 0 ? (
-          <span className="font-mono font-semibold text-rose-400">- {euro(p.retenue)}</span>
+          <span className="font-mono font-semibold text-rose-600">- {euro(p.retenue)}</span>
         ) : (
           <span className="text-subtle">—</span>
         ),

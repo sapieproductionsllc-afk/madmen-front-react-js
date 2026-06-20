@@ -103,7 +103,7 @@ export default function Rapports() {
               <h2 className="text-base font-semibold text-ink">Évolution de la productivité</h2>
               <p className="text-xs text-subtle">{d.range}</p>
             </div>
-            <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-400">
+            <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600">
               <Icon name="arrow_upward" className="text-[14px]" />
               {d.prodTrend}
             </span>
@@ -123,7 +123,7 @@ export default function Rapports() {
                   <div className="border-t border-border" />
                   <div className="border-t border-border" />
                 </div>
-                <AreaChart data={d.serie} height={150} color="#f4c430" id={`rapport-${periode}`} dots />
+                <AreaChart data={d.serie} height={150} color="#1a535c" id={`rapport-${periode}`} dots />
               </div>
               <div className="flex justify-between text-[10px] text-subtle mt-2">
                 {d.xLabels.map((l) => (

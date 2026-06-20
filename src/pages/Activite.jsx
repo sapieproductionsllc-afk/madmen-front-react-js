@@ -7,9 +7,9 @@ import { useUI } from "../components/ui/UIProvider.jsx";
 import { activity } from "../data/mockData.js";
 
 const statut = {
-  Actif: { tone: "text-emerald-400", label: "text-texte" },
-  Inactif: { tone: "text-amber-400", label: "text-texte" },
-  Incident: { tone: "text-rose-400", label: "text-rose-400 font-medium" },
+  Actif: { tone: "text-emerald-600", label: "text-texte" },
+  Inactif: { tone: "text-amber-600", label: "text-texte" },
+  Incident: { tone: "text-rose-600", label: "text-rose-600 font-medium" },
 };
 
 export default function Activite() {

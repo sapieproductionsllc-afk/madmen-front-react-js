@@ -2,10 +2,10 @@ import Icon from "./Icon.jsx";
 
 const variants = {
   primary: "bg-brand-600 text-canvas hover:bg-brand-700 shadow-sm",
-  secondary: "bg-surface-2 text-texte border border-border-strong hover:bg-surface-2",
+  secondary: "bg-surface-2 text-texte border border-border-strong hover:border-brand-600/50 hover:text-ink",
   ghost: "text-muted hover:bg-surface-2 hover:text-texte",
   danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm",
-  "danger-soft": "bg-rose-400/10 text-rose-400 hover:bg-rose-400/15",
+  "danger-soft": "bg-rose-50 text-rose-600 hover:bg-rose-100",
 };
 
 const sizes = {

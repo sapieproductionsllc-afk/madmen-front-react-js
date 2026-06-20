@@ -84,7 +84,7 @@ export default function Login() {
       {/* Halo & texture de fond (profondeur discrète autour de la carte) */}
       <div className="absolute -top-32 -left-24 w-[34rem] h-[34rem] rounded-full bg-brand-500/15 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-24 w-[34rem] h-[34rem] rounded-full bg-brand-500/10 blur-3xl pointer-events-none" />
-      <Vagues color="#f4c430" opacity="0.04" />
+      <Vagues color="#1a535c" opacity="0.05" />
 
       <div className="reveal relative w-full max-w-5xl grid md:grid-cols-2 rounded-2xl overflow-hidden shadow-pop border border-[var(--border)] bg-surface md:min-h-[580px]">
         {/* ---------- Colonne formulaire ---------- */}
@@ -165,7 +165,7 @@ export default function Login() {
               </div>
 
               {erreur && (
-                <p role="alert" className="flex items-center gap-1.5 text-sm text-rose-400">
+                <p role="alert" className="flex items-center gap-1.5 text-sm text-rose-600">
                   <Icon name="error" className="text-[18px]" />
                   {erreur}
                 </p>
@@ -214,8 +214,8 @@ export default function Login() {
         </div>
 
         {/* ---------- Colonne visuelle (vitrine produit) ---------- */}
-        <div className="hidden md:flex relative flex-col justify-between p-10 overflow-hidden bg-gradient-to-br from-brand-900 via-canvas to-black text-white">
-          <Vagues color="#f4c430" opacity="0.06" />
+        <div className="hidden md:flex relative flex-col justify-between p-10 overflow-hidden bg-gradient-to-br from-brand-600 via-brand-700 to-brand-800 text-white">
+          <Vagues color="#ffffff" opacity="0.07" />
           <div className="absolute -top-16 -right-10 w-72 h-72 rounded-full bg-brand-400/20 blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -left-16 w-80 h-80 rounded-full bg-brand-500/12 blur-3xl pointer-events-none" />
 
@@ -244,7 +244,7 @@ export default function Login() {
                   <Icon name="arrow_upward" className="text-[12px]" />3,2 %
                 </span>
               </div>
-              <AreaChart data={[58, 64, 61, 70, 67, 76, 80, 86, 90, 94]} height={46} color="#f4c430" id="loginprev" />
+              <AreaChart data={[58, 64, 61, 70, 67, 76, 80, 86, 90, 94]} height={46} color="#d2be9b" id="loginprev" />
               <div className="grid grid-cols-2 gap-2.5 mt-4">
                 <div className="rounded-xl bg-white/[0.07] border border-white/10 p-2.5">
                   <p className="text-[10px] font-medium text-white/50 uppercase tracking-wider mb-0.5">Productivité</p>

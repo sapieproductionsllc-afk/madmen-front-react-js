@@ -8,14 +8,14 @@ import { alertes, employes, agencesList } from "../../data/datasets.js";
 
 const iconeAlerte = { Critique: "gpp_bad", Moyen: "warning", Faible: "info" };
 const couleurAlerte = {
-  Critique: "bg-rose-400/10 text-rose-400",
-  Moyen: "bg-amber-400/10 text-amber-400",
-  Faible: "bg-slate-400/10 text-slate-400",
+  Critique: "bg-rose-50 text-rose-600",
+  Moyen: "bg-amber-50 text-amber-600",
+  Faible: "bg-slate-50 text-slate-600",
 };
 
 function ItemMenu({ icon, label, onClick, to, danger }) {
   const classe = `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-    danger ? "text-rose-400 hover:bg-rose-400/10" : "text-muted hover:bg-surface-2 hover:text-texte"
+    danger ? "text-rose-600 hover:bg-rose-50" : "text-muted hover:bg-surface-2 hover:text-texte"
   }`;
   const contenu = (
     <>
@@ -248,7 +248,7 @@ export default function TopNav({ onMenuClick }) {
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <span className="text-sm font-semibold text-ink tracking-tight">Notifications</span>
                 {nonLues > 0 && (
-                  <span className="text-[11px] font-semibold text-rose-400 bg-rose-400/10 tabular-nums px-2 py-0.5 rounded-full">{nonLues} non lues</span>
+                  <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 tabular-nums px-2 py-0.5 rounded-full">{nonLues} non lues</span>
                 )}
               </div>
               <div className="max-h-80 overflow-y-auto scroll-thin">

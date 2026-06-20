@@ -28,6 +28,7 @@ function Toast({ message, type }) {
 export function UIProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const [confirmState, setConfirmState] = useState(null);
+  const [champValue, setChampValue] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [agence, setAgence] = useState("Toutes les agences");
 
@@ -37,7 +38,10 @@ export function UIProvider({ children }) {
     setTimeout(() => setToasts((list) => list.filter((x) => x.id !== id)), 3400);
   }, []);
 
-  const confirm = useCallback((opts) => setConfirmState(opts), []);
+  const confirm = useCallback((opts) => {
+    setChampValue(opts.input?.defaultValue ?? "");
+    setConfirmState(opts);
+  }, []);
   const openAddEmployee = useCallback(() => setAddOpen(true), []);
 
   const fermerConfirm = () => setConfirmState(null);
@@ -68,8 +72,9 @@ export function UIProvider({ children }) {
             </Button>
             <Button
               variant={confirmState?.danger ? "danger" : "primary"}
+              disabled={confirmState?.input?.required && !champValue.trim()}
               onClick={() => {
-                confirmState?.onConfirm?.();
+                confirmState?.onConfirm?.(champValue.trim());
                 fermerConfirm();
               }}
             >
@@ -79,6 +84,21 @@ export function UIProvider({ children }) {
         }
       >
         <p className="text-sm text-texte">{confirmState?.message}</p>
+        {confirmState?.input && (
+          <div className="mt-4">
+            <label className="block text-xs font-medium text-muted mb-1.5">
+              {confirmState.input.label}
+              {confirmState.input.required && <span className="text-rose-600"> *</span>}
+            </label>
+            <textarea
+              value={champValue}
+              onChange={(e) => setChampValue(e.target.value)}
+              placeholder={confirmState.input.placeholder}
+              rows={3}
+              className="w-full rounded-lg bg-canvas border border-border px-3.5 py-2.5 text-sm text-texte placeholder:text-muted outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 resize-none"
+            />
+          </div>
+        )}
       </Modal>
 
       {/* Ajout d'employé (global) */}

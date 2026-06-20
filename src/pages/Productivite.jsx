@@ -7,7 +7,17 @@ import { useUI } from "../components/ui/UIProvider.jsx";
 import { productivity } from "../data/mockData.js";
 import { classement } from "../data/datasets.js";
 
-const medaille = ["text-amber-500", "text-subtle", "text-amber-700"];
+// Podium : or / argent / bronze réels
+const medaille = ["text-brand-500", "text-slate-600", "text-amber-600"];
+
+// Échelle sémantique de performance pour les barres de score
+const barreScore = {
+  emerald: "bg-emerald-500",
+  brand: "bg-brand-500",
+  amber: "bg-amber-500",
+  rose: "bg-rose-500",
+};
+const tonScore = (p) => (p >= 90 ? "emerald" : p >= 80 ? "brand" : p >= 70 ? "amber" : "rose");
 
 export default function Productivite() {
   const { toast } = useUI();
@@ -29,12 +39,12 @@ export default function Productivite() {
                 {productivity.value.toLocaleString("fr-FR", { minimumFractionDigits: 1 })} %
               </p>
             </div>
-            <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-400">
+            <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700">
               <Icon name="arrow_upward" className="text-[14px]" />
               {productivity.weeklyGrowth} %
             </span>
           </div>
-          <AreaChart data={productivity.series} height={150} id="prodpage" color="#f4c430" />
+          <AreaChart data={productivity.series} height={150} id="prodpage" color="#1a535c" />
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
           <StatTile icon="schedule" label="Temps travaillé moyen" value="6h 45m" color="indigo" />
@@ -58,7 +68,7 @@ export default function Productivite() {
               </div>
               <div className="w-32 hidden sm:block">
                 <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                  <div className="h-full bg-brand-500 rounded-full" style={{ width: `${c.productivity}%` }} />
+                  <div className={`h-full rounded-full ${barreScore[tonScore(c.productivity)]}`} style={{ width: `${c.productivity}%` }} />
                 </div>
               </div>
               <span className="font-mono font-semibold text-ink w-12 text-right">{c.productivity} %</span>
