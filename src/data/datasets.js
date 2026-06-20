@@ -1,18 +1,20 @@
 // Données fictives pour l'ensemble des pages (à remplacer plus tard par l'API).
 
+// SOURCE UNIQUE : chaque employé porte son pointage du jour (`today`).
+// Tous les chiffres de l'app (dashboard, présence, agences) en sont dérivés.
 export const employes = [
-  { id: "AUR-8821", name: "Elena Vance", fonction: "Responsable Cybersécurité", department: "Cybersécurité", agence: "Siège Social", phone: "+33 6 12 45 78 90", email: "e.vance@madmen.io", status: "Actif" },
-  { id: "AUR-4491", name: "Marcus Thorne", fonction: "Ingénieur Infrastructure", department: "Infrastructure", agence: "Agence Nord", phone: "+33 6 88 21 09 14", email: "m.thorne@madmen.io", status: "Congé" },
-  { id: "AUR-1102", name: "Julian Rossi", fonction: "Chercheur IA", department: "Recherche IA", agence: "Agence Centre", phone: "+33 6 47 55 33 21", email: "j.rossi@madmen.io", status: "Actif" },
-  { id: "AUR-9031", name: "Sarah Jenkins", fonction: "Coordinatrice Opérations", department: "Opérations", agence: "Agence Sud", phone: "+33 6 33 78 12 90", email: "s.jenkins@madmen.io", status: "Suspendu" },
-  { id: "AUR-7720", name: "David Mercier", fonction: "Comptable Senior", department: "Finance", agence: "Siège Social", phone: "+33 6 21 44 67 80", email: "d.mercier@madmen.io", status: "Actif" },
-  { id: "AUR-6654", name: "Amélie Dubois", fonction: "Chargée RH", department: "Ressources Humaines", agence: "Siège Social", phone: "+33 6 09 87 65 43", email: "a.dubois@madmen.io", status: "Actif" },
-  { id: "AUR-3398", name: "Karim Benali", fonction: "Technicien Support", department: "Infrastructure", agence: "Agence Est", phone: "+33 6 55 12 34 56", email: "k.benali@madmen.io", status: "Actif" },
-  { id: "AUR-2241", name: "Léa Fontaine", fonction: "Analyste Données", department: "Recherche IA", agence: "Agence Centre", phone: "+33 6 78 90 12 34", email: "l.fontaine@madmen.io", status: "Actif" },
-  { id: "AUR-5567", name: "Thomas Girard", fonction: "Chef de Projet", department: "Opérations", agence: "Agence Nord", phone: "+33 6 41 23 65 87", email: "t.girard@madmen.io", status: "Actif" },
-  { id: "AUR-8843", name: "Nadia Cherif", fonction: "Juriste", department: "Juridique", agence: "Siège Social", phone: "+33 6 62 89 47 10", email: "n.cherif@madmen.io", status: "Congé" },
-  { id: "AUR-1190", name: "Paul Lefèvre", fonction: "Agent de Sécurité", department: "Sécurité", agence: "Agence Sud", phone: "+33 6 17 28 39 40", email: "p.lefevre@madmen.io", status: "Actif" },
-  { id: "AUR-7012", name: "Inès Moreau", fonction: "Designer Produit", department: "Recherche IA", agence: "Agence Est", phone: "+33 6 30 51 72 93", email: "i.moreau@madmen.io", status: "Actif" },
+  { id: "AUR-8821", name: "Elena Vance", fonction: "Responsable Cybersécurité", department: "Cybersécurité", agence: "Siège Social", phone: "+33 6 12 45 78 90", email: "e.vance@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:14", retardMin: 0, retenue: 0, statut: "Présent", poste: "WS-042-ALPHA", justification: null } },
+  { id: "AUR-4491", name: "Marcus Thorne", fonction: "Ingénieur Infrastructure", department: "Infrastructure", agence: "Agence Nord", phone: "+33 6 88 21 09 14", email: "m.thorne@madmen.io", status: "Congé", today: { prevu: "08:30", arrivee: "--:--", retardMin: null, retenue: 0, statut: "Congé", poste: "Distant", justification: { statut: "Justifié", motif: "Congé approuvé", via: "RH" } } },
+  { id: "AUR-1102", name: "Julian Rossi", fonction: "Chercheur IA", department: "Recherche IA", agence: "Agence Centre", phone: "+33 6 47 55 33 21", email: "j.rossi@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:47", retardMin: 17, retenue: 34, statut: "Retard", poste: "WS-119-BETA", justification: null } },
+  { id: "AUR-9031", name: "Sarah Jenkins", fonction: "Coordinatrice Opérations", department: "Opérations", agence: "Agence Sud", phone: "+33 6 33 78 12 90", email: "s.jenkins@madmen.io", status: "Suspendu", today: { prevu: "08:30", arrivee: "--:--", retardMin: null, retenue: 0, statut: "Absent", poste: "HORS LIGNE", justification: { statut: "À justifier" } } },
+  { id: "AUR-7720", name: "David Mercier", fonction: "Comptable Senior", department: "Finance", agence: "Siège Social", phone: "+33 6 21 44 67 80", email: "d.mercier@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:25", retardMin: 0, retenue: 0, statut: "Présent", poste: "WS-011", justification: null } },
+  { id: "AUR-6654", name: "Amélie Dubois", fonction: "Chargée RH", department: "Ressources Humaines", agence: "Siège Social", phone: "+33 6 09 87 65 43", email: "a.dubois@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:33", retardMin: 3, retenue: 0, statut: "Présent", poste: "WS-014", justification: null } },
+  { id: "AUR-3398", name: "Karim Benali", fonction: "Technicien Support", department: "Infrastructure", agence: "Agence Est", phone: "+33 6 55 12 34 56", email: "k.benali@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:39", retardMin: 9, retenue: 18, statut: "Retard", poste: "WS-205", justification: null } },
+  { id: "AUR-2241", name: "Léa Fontaine", fonction: "Analyste Données", department: "Recherche IA", agence: "Agence Centre", phone: "+33 6 78 90 12 34", email: "l.fontaine@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "09:05", retardMin: 35, retenue: 70, statut: "Retard", poste: "WS-121", justification: null } },
+  { id: "AUR-5567", name: "Thomas Girard", fonction: "Chef de Projet", department: "Opérations", agence: "Agence Nord", phone: "+33 6 41 23 65 87", email: "t.girard@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:20", retardMin: 0, retenue: 0, statut: "Présent", poste: "WS-301", justification: null } },
+  { id: "AUR-8843", name: "Nadia Cherif", fonction: "Juriste", department: "Juridique", agence: "Siège Social", phone: "+33 6 62 89 47 10", email: "n.cherif@madmen.io", status: "Congé", today: { prevu: "08:30", arrivee: "--:--", retardMin: null, retenue: 0, statut: "Congé", poste: "Distant", justification: { statut: "Justifié", motif: "Congé approuvé", via: "RH" } } },
+  { id: "AUR-1190", name: "Paul Lefèvre", fonction: "Agent de Sécurité", department: "Sécurité", agence: "Agence Sud", phone: "+33 6 17 28 39 40", email: "p.lefevre@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "--:--", retardMin: null, retenue: 0, statut: "Absent", poste: "HORS LIGNE", justification: { statut: "Justifié", motif: "Rendez-vous médical", via: "App employé" } } },
+  { id: "AUR-7012", name: "Inès Moreau", fonction: "Designer Produit", department: "Recherche IA", agence: "Agence Est", phone: "+33 6 30 51 72 93", email: "i.moreau@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:28", retardMin: 0, retenue: 0, statut: "Présent", poste: "WS-208", justification: null } },
 ];
 
 export const departements = [
@@ -24,16 +26,31 @@ export const departements = [
   { name: "Ressources Humaines", lead: "Amélie Dubois", headcount: 18, agence: "Siège Social" },
 ];
 
+// retenues = total ; retardRetenue = part liée aux retards (prélèvement automatique)
 export const paie = [
-  { id: "AUR-8821", name: "Elena Vance", base: 5200, primes: 800, avances: 0, retenues: 420, status: "Validé" },
-  { id: "AUR-1102", name: "Julian Rossi", base: 4800, primes: 600, avances: 500, retenues: 380, status: "Validé" },
-  { id: "AUR-7720", name: "David Mercier", base: 4100, primes: 300, avances: 0, retenues: 320, status: "En attente" },
-  { id: "AUR-6654", name: "Amélie Dubois", base: 3600, primes: 250, avances: 200, retenues: 280, status: "Validé" },
-  { id: "AUR-5567", name: "Thomas Girard", base: 4300, primes: 450, avances: 0, retenues: 350, status: "En attente" },
-  { id: "AUR-3398", name: "Karim Benali", base: 2800, primes: 150, avances: 300, retenues: 210, status: "Validé" },
-  { id: "AUR-2241", name: "Léa Fontaine", base: 3900, primes: 400, avances: 0, retenues: 300, status: "En attente" },
-  { id: "AUR-1190", name: "Paul Lefèvre", base: 2400, primes: 120, avances: 0, retenues: 180, status: "Validé" },
+  { id: "AUR-8821", name: "Elena Vance", base: 5200, primes: 800, avances: 0, retenues: 420, retardRetenue: 0, status: "Validé" },
+  { id: "AUR-1102", name: "Julian Rossi", base: 4800, primes: 600, avances: 500, retenues: 380, retardRetenue: 34, status: "Validé" },
+  { id: "AUR-7720", name: "David Mercier", base: 4100, primes: 300, avances: 0, retenues: 320, retardRetenue: 0, status: "En attente" },
+  { id: "AUR-6654", name: "Amélie Dubois", base: 3600, primes: 250, avances: 200, retenues: 280, retardRetenue: 0, status: "Validé" },
+  { id: "AUR-5567", name: "Thomas Girard", base: 4300, primes: 450, avances: 0, retenues: 350, retardRetenue: 0, status: "En attente" },
+  { id: "AUR-3398", name: "Karim Benali", base: 2800, primes: 150, avances: 300, retenues: 210, retardRetenue: 18, status: "Validé" },
+  { id: "AUR-2241", name: "Léa Fontaine", base: 3900, primes: 400, avances: 0, retenues: 370, retardRetenue: 70, status: "En attente" },
+  { id: "AUR-1190", name: "Paul Lefèvre", base: 2400, primes: 120, avances: 0, retenues: 180, retardRetenue: 0, status: "Validé" },
 ];
+
+// Pointages du jour (ZKTeco K40) — DÉRIVÉS de la source unique `employes`.
+// Règle : retard > 5 min => retenue auto (2 €/min).
+export const pointages = employes.map((e) => ({
+  id: e.id,
+  name: e.name,
+  agence: e.agence,
+  prevu: e.today.prevu,
+  arrivee: e.today.arrivee,
+  retardMin: e.today.retardMin,
+  retenue: e.today.retenue,
+  status: e.today.statut,
+  justification: e.today.justification,
+}));
 
 export const alertes = [
   { id: 1, type: "Tentative refusée", severity: "Critique", employe: "Inconnu", agence: "Siège Social", machine: "WS-042-ALPHA", time: "09:42", message: "3 tentatives de connexion refusées (PIN incorrect).", read: false },
@@ -89,3 +106,6 @@ export const rapports = [
 
 export const agencesList = ["Siège Social", "Agence Centre", "Agence Nord", "Agence Sud", "Agence Est"];
 export const statutsEmploye = ["Actif", "Congé", "Suspendu"];
+
+// Source unique du compteur d'alertes (utilisé par le menu latéral ET le header)
+export const alertesNonLues = alertes.filter((a) => !a.read).length;

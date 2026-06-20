@@ -27,22 +27,22 @@ export default function Utilisateurs() {
         <div className="flex items-center gap-3">
           <Avatar name={u.name} size="w-8 h-8" />
           <div>
-            <p className="text-sm font-medium text-slate-800">{u.name}</p>
-            <p className="text-xs text-slate-400">{u.email}</p>
+            <p className="text-sm font-medium text-ink">{u.name}</p>
+            <p className="text-xs text-subtle">{u.email}</p>
           </div>
         </div>
       ),
     },
-    { key: "role", label: "Rôle", render: (u) => <span className="font-medium text-slate-700">{u.role}</span> },
-    { key: "agence", label: "Agence", render: (u) => <span className="text-slate-600">{u.agence}</span> },
-    { key: "lastLogin", label: "Dernier accès", render: (u) => <span className="text-slate-500">{u.lastLogin}</span> },
+    { key: "role", label: "Rôle", render: (u) => <span className="font-medium text-texte">{u.role}</span> },
+    { key: "agence", label: "Agence", render: (u) => <span className="text-texte">{u.agence}</span> },
+    { key: "lastLogin", label: "Dernier accès", render: (u) => <span className="text-muted">{u.lastLogin}</span> },
     { key: "status", label: "Statut", render: (u) => <StatusPill label={u.status} tone={u.status === "Actif" ? "emerald" : "rose"} /> },
     {
       key: "actions",
       label: "",
       align: "right",
       render: (u) => (
-        <button onClick={() => suspendre(u)} className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg p-1.5 transition-colors" title="Suspendre l'accès">
+        <button onClick={() => suspendre(u)} className="text-subtle hover:text-rose-400 hover:bg-rose-500/15 rounded-lg p-1.5 transition-colors" title="Suspendre l'accès">
           <Icon name="block" className="text-[18px]" />
         </button>
       ),
@@ -62,16 +62,16 @@ export default function Utilisateurs() {
           <div key={r.name} className="card p-4">
             <div className="flex items-center justify-between mb-2">
               <StatusPill label={r.name} tone={r.tone} dot={false} />
-              <span className="text-xs text-slate-400">{r.users} compte(s)</span>
+              <span className="text-xs text-subtle">{r.users} compte(s)</span>
             </div>
-            <p className="text-xs text-slate-500">{r.desc}</p>
+            <p className="text-xs text-muted">{r.desc}</p>
           </div>
         ))}
       </div>
 
       <div className="card">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-slate-800">Comptes utilisateurs</h2>
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-base font-semibold text-ink">Comptes utilisateurs</h2>
         </div>
         <Table columns={colonnes} data={utilisateurs} rowKey={(u) => u.id} />
       </div>

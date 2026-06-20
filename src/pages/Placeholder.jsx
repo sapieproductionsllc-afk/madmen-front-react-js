@@ -18,8 +18,8 @@ export default function PagePlaceholder({
         </div>
         <div>
           <p className="kicker mb-1">{pole}</p>
-          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight leading-tight">{title}</h1>
-          {subtitle && <p className="mt-1 text-slate-500 max-w-xl">{subtitle}</p>}
+          <h1 className="text-2xl font-semibold text-ink tracking-tight leading-tight">{title}</h1>
+          {subtitle && <p className="mt-1 text-muted max-w-xl">{subtitle}</p>}
         </div>
       </header>
 
@@ -29,22 +29,22 @@ export default function PagePlaceholder({
             Bientôt disponible
           </span>
           {role && (
-            <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+            <span className="px-2.5 py-1 rounded-full bg-slate-500/15 text-slate-400 text-xs font-medium">
               Accès : {role}
             </span>
           )}
           {sensible && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 text-xs font-medium">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-400 text-xs font-medium">
               <Icon name="lock" className="text-[14px]" /> Données sensibles
             </span>
           )}
         </div>
 
-        <p className="text-sm font-medium text-slate-700 mb-4">Cette page regroupera :</p>
+        <p className="text-sm font-medium text-texte mb-4">Cette page regroupera :</p>
         <ul className="grid sm:grid-cols-2 gap-3">
           {sections.map((s) => (
-            <li key={s} className="flex items-start gap-2.5 text-sm text-slate-600">
-              <Icon name="check_circle" className="text-emerald-500 text-[18px] mt-0.5 shrink-0" filled />
+            <li key={s} className="flex items-start gap-2.5 text-sm text-texte">
+              <Icon name="check_circle" className="text-emerald-400 text-[18px] mt-0.5 shrink-0" filled />
               {s}
             </li>
           ))}

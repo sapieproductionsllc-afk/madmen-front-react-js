@@ -7,18 +7,18 @@ import { useUI } from "../components/ui/UIProvider.jsx";
 import { activity } from "../data/mockData.js";
 
 const statut = {
-  Actif: { tone: "text-emerald-500", label: "text-slate-700" },
-  Inactif: { tone: "text-amber-500", label: "text-slate-600" },
-  Incident: { tone: "text-rose-500", label: "text-rose-600 font-medium" },
+  Actif: { tone: "text-emerald-400", label: "text-texte" },
+  Inactif: { tone: "text-amber-400", label: "text-texte" },
+  Incident: { tone: "text-rose-400", label: "text-rose-400 font-medium" },
 };
 
 export default function Activite() {
   const { toast } = useUI();
 
   const colonnes = [
-    { key: "name", label: "Employé", render: (l) => <span className="font-medium text-slate-800">{l.name}</span> },
-    { key: "machine", label: "Machine", render: (l) => <span className="font-mono text-slate-500">{l.machine}</span> },
-    { key: "agence", label: "Agence", render: (l) => <span className="text-slate-600">{l.agence}</span> },
+    { key: "name", label: "Employé", render: (l) => <span className="font-medium text-ink">{l.name}</span> },
+    { key: "machine", label: "Machine", render: (l) => <span className="font-mono text-muted">{l.machine}</span> },
+    { key: "agence", label: "Agence", render: (l) => <span className="text-texte">{l.agence}</span> },
     {
       key: "status",
       label: "Statut",
@@ -38,14 +38,14 @@ export default function Activite() {
       render: (l) => (
         <div className="flex gap-1.5">
           {l.apps.map((a) => (
-            <span key={a} className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-50 border border-slate-200 text-slate-600">
+            <span key={a} className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 border border-border text-texte">
               {a}
             </span>
           ))}
         </div>
       ),
     },
-    { key: "worked", label: "Temps travaillé", align: "right", render: (l) => <span className="font-mono font-medium text-slate-700">{l.worked}</span> },
+    { key: "worked", label: "Temps travaillé", align: "right", render: (l) => <span className="font-mono font-medium text-texte">{l.worked}</span> },
   ];
 
   return (
@@ -64,8 +64,8 @@ export default function Activite() {
       </div>
 
       <div className="card">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-slate-800">Flux d'activité en direct</h2>
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-base font-semibold text-ink">Flux d'activité en direct</h2>
         </div>
         <Table columns={colonnes} data={activity} rowKey={(l) => l.id} />
       </div>

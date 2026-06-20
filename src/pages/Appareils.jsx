@@ -20,19 +20,19 @@ export default function Appareils() {
       label: "Appareil",
       render: (a) => (
         <div className="flex items-center gap-3">
-          <span className="w-9 h-9 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
+          <span className="w-9 h-9 rounded-lg bg-surface-2 text-muted flex items-center justify-center">
             <Icon name={iconeType[a.type] ?? "sensors"} className="text-[20px]" />
           </span>
           <div>
-            <p className="text-sm font-medium text-slate-800">{a.name}</p>
-            <p className="text-xs text-slate-400">{a.type}</p>
+            <p className="text-sm font-medium text-ink">{a.name}</p>
+            <p className="text-xs text-subtle">{a.type}</p>
           </div>
         </div>
       ),
     },
-    { key: "agence", label: "Agence", render: (a) => <span className="text-slate-600">{a.agence}</span> },
+    { key: "agence", label: "Agence", render: (a) => <span className="text-texte">{a.agence}</span> },
     { key: "status", label: "État", render: (a) => <StatusPill label={a.status} tone={tone[a.status]} /> },
-    { key: "lastSync", label: "Dernière synchro.", render: (a) => <span className="text-slate-500">{a.lastSync}</span> },
+    { key: "lastSync", label: "Dernière synchro.", render: (a) => <span className="text-muted">{a.lastSync}</span> },
     {
       key: "actions",
       label: "",

@@ -10,16 +10,17 @@ export default function Dashboard() {
       {/* En-tête */}
       <header className="reveal flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-[1.75rem] font-semibold text-slate-900 tracking-tight">
+          <p className="kicker mb-2">Tableau de bord</p>
+          <h1 className="text-2xl md:text-[1.75rem] font-semibold text-ink tracking-tight">
             Résumé exécutif
           </h1>
-          <p className="mt-1 text-slate-500">
+          <p className="mt-1.5 text-sm text-muted leading-relaxed">
             Performance globale de l'organisation et supervision en temps réel.
           </p>
         </div>
-        <div className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 shadow-soft self-start md:self-auto">
+        <div className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-surface border border-border shadow-soft self-start md:self-auto">
           <span className="live-dot text-emerald-500" />
-          <span className="text-sm text-slate-600">Tous les systèmes opérationnels</span>
+          <span className="text-sm font-medium text-muted">Tous les systèmes opérationnels</span>
         </div>
       </header>
 

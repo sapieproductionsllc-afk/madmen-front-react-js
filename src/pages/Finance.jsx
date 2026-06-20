@@ -31,12 +31,27 @@ export default function Finance() {
     });
 
   const colonnes = [
-    { key: "name", label: "Employé", render: (p) => <span className="font-medium text-slate-800">{p.name}</span> },
+    { key: "name", label: "Employé", render: (p) => <span className="font-medium text-ink">{p.name}</span> },
     { key: "base", label: "Salaire de base", align: "right", render: (p) => <span className="font-mono">{masque(euro(p.base))}</span> },
-    { key: "primes", label: "Primes", align: "right", render: (p) => <span className="font-mono text-emerald-600">{masque(euro(p.primes))}</span> },
-    { key: "avances", label: "Avances", align: "right", render: (p) => <span className="font-mono text-amber-600">{masque(p.avances ? `- ${euro(p.avances)}` : euro(0))}</span> },
-    { key: "retenues", label: "Retenues", align: "right", render: (p) => <span className="font-mono text-rose-600">{masque(`- ${euro(p.retenues)}`)}</span> },
-    { key: "net", label: "Net à payer", align: "right", render: (p) => <span className="font-mono font-semibold text-slate-900">{masque(euro(net(p)))}</span> },
+    { key: "primes", label: "Primes", align: "right", render: (p) => <span className="font-mono text-emerald-400">{masque(euro(p.primes))}</span> },
+    { key: "avances", label: "Avances", align: "right", render: (p) => <span className="font-mono text-amber-400">{masque(p.avances ? `- ${euro(p.avances)}` : euro(0))}</span> },
+    {
+      key: "retenues",
+      label: "Retenues",
+      align: "right",
+      render: (p) => (
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="font-mono text-rose-400">{masque(`- ${euro(p.retenues)}`)}</span>
+          {p.retardRetenue > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded">
+              <Icon name="schedule" className="text-[12px]" />
+              dont {masque(euro(p.retardRetenue))} retard
+            </span>
+          )}
+        </div>
+      ),
+    },
+    { key: "net", label: "Net à payer", align: "right", render: (p) => <span className="font-mono font-semibold text-ink">{masque(euro(net(p)))}</span> },
     { key: "status", label: "Statut", render: (p) => <StatusPill label={p.status} tone={p.status === "Validé" ? "emerald" : "amber"} /> },
     {
       key: "actions",
@@ -72,9 +87,9 @@ export default function Finance() {
       </div>
 
       <div className="card">
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100">
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-border">
           <Icon name="lock" className="text-rose-500 text-[18px]" />
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted">
             Données sensibles — accès réservé à la <b>Comptabilité</b> et aux <b>RH</b>. Les montants sont masqués par défaut.
           </p>
         </div>

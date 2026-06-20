@@ -1,3 +1,5 @@
+import { memo, useMemo } from "react";
+
 // Courbe d'aire lissée (SVG) — rendu élégant pour les tendances.
 function smoothPath(points) {
   if (points.length < 2) return "";
@@ -16,21 +18,28 @@ function smoothPath(points) {
   return d.join(" ");
 }
 
-export default function AreaChart({ data = [], height = 130, color = "#e6c178", id = "area" }) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const norm = (v) => (v - min) / (max - min || 1);
+function AreaChart({ data = [], height = 130, color = "#e6c178", id = "area", dots = false }) {
+  // Le tracé ne dépend que de `data` : mémoïsé pour éviter ~80 recalculs SVG
+  // pendant le count-up (qui re-rend le parent à ~60 fps).
+  const geometry = useMemo(() => {
+    if (data.length < 2) return null;
+    const max = Math.max(...data);
+    const min = Math.min(...data);
+    const norm = (v) => (v - min) / (max - min || 1);
 
-  // viewBox 0..100, marge verticale de 12 %
-  const pts = data.map((v, i) => [
-    (i / (data.length - 1)) * 100,
-    100 - (norm(v) * 76 + 12),
-  ]);
+    // viewBox 0..100, marge verticale de 12 %
+    const pts = data.map((v, i) => [
+      (i / (data.length - 1)) * 100,
+      100 - (norm(v) * 76 + 12),
+    ]);
 
-  const line = smoothPath(pts);
-  const area = `${line} L 100,100 L 0,100 Z`;
-  const last = pts[pts.length - 1];
+    const line = smoothPath(pts);
+    const area = `${line} L 100,100 L 0,100 Z`;
+    return { pts, line, area, last: pts[pts.length - 1] };
+  }, [data]);
+
+  if (!geometry) return null;
+  const { pts, line, area, last } = geometry;
 
   return (
     <div className="relative w-full" style={{ height }}>
@@ -52,6 +61,14 @@ export default function AreaChart({ data = [], height = 130, color = "#e6c178", 
           strokeLinecap="round"
         />
       </svg>
+      {dots &&
+        pts.slice(0, -1).map(([x, y], i) => (
+          <span
+            key={i}
+            className="absolute w-2 h-2 rounded-full bg-white"
+            style={{ left: `${x}%`, top: `${y}%`, transform: "translate(-50%, -50%)", boxShadow: `0 0 0 2px ${color}` }}
+          />
+        ))}
       <span
         className="absolute w-2 h-2 rounded-full"
         style={{
@@ -65,3 +82,5 @@ export default function AreaChart({ data = [], height = 130, color = "#e6c178", 
     </div>
   );
 }
+
+export default memo(AreaChart);

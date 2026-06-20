@@ -1,19 +1,8 @@
 import { useState } from "react";
 import Modal from "../ui/Modal.jsx";
 import Button from "../ui/Button.jsx";
+import { Input, Select, Field as Champ } from "../ui/Input.jsx";
 import { agencesList, statutsEmploye } from "../../data/datasets.js";
-
-const champ =
-  "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400 transition";
-
-function Champ({ label, children }) {
-  return (
-    <label className="block">
-      <span className="block text-xs font-medium text-slate-500 mb-1.5">{label}</span>
-      {children}
-    </label>
-  );
-}
 
 export default function AddEmployeeModal({ open, onClose, onSaved }) {
   const [form, setForm] = useState({ nom: "", fonction: "", agence: agencesList[0], statut: statutsEmploye[0] });
@@ -46,30 +35,28 @@ export default function AddEmployeeModal({ open, onClose, onSaved }) {
       }
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="sm:col-span-2">
-          <Champ label="Nom et prénom *">
-            <input className={champ} value={form.nom} onChange={maj("nom")} placeholder="Ex. Jean Dupont" />
-          </Champ>
-        </div>
+        <Champ label="Nom et prénom *" className="sm:col-span-2">
+          <Input value={form.nom} onChange={maj("nom")} placeholder="Ex. Jean Dupont" />
+        </Champ>
         <Champ label="Fonction">
-          <input className={champ} value={form.fonction} onChange={maj("fonction")} placeholder="Ex. Comptable" />
+          <Input value={form.fonction} onChange={maj("fonction")} placeholder="Ex. Comptable" />
         </Champ>
         <Champ label="Agence">
-          <select className={champ} value={form.agence} onChange={maj("agence")}>
+          <Select value={form.agence} onChange={maj("agence")}>
             {agencesList.map((a) => (
               <option key={a}>{a}</option>
             ))}
-          </select>
+          </Select>
         </Champ>
         <Champ label="Téléphone">
-          <input className={champ} placeholder="+33 6 00 00 00 00" />
+          <Input placeholder="+33 6 00 00 00 00" />
         </Champ>
         <Champ label="Statut">
-          <select className={champ} value={form.statut} onChange={maj("statut")}>
+          <Select value={form.statut} onChange={maj("statut")}>
             {statutsEmploye.map((s) => (
               <option key={s}>{s}</option>
             ))}
-          </select>
+          </Select>
         </Champ>
       </div>
 

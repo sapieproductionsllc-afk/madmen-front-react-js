@@ -7,7 +7,7 @@ import { useUI } from "../components/ui/UIProvider.jsx";
 import { productivity } from "../data/mockData.js";
 import { classement } from "../data/datasets.js";
 
-const medaille = ["text-amber-500", "text-slate-400", "text-amber-700"];
+const medaille = ["text-amber-500", "text-subtle", "text-amber-700"];
 
 export default function Productivite() {
   const { toast } = useUI();
@@ -25,11 +25,11 @@ export default function Productivite() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="kicker mb-1">Productivité globale — 12 jours</p>
-              <p className="text-3xl font-semibold text-slate-900 tabular-nums">
+              <p className="text-3xl font-semibold text-ink tabular-nums">
                 {productivity.value.toLocaleString("fr-FR", { minimumFractionDigits: 1 })} %
               </p>
             </div>
-            <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600">
+            <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-400">
               <Icon name="arrow_upward" className="text-[14px]" />
               {productivity.weeklyGrowth} %
             </span>
@@ -43,25 +43,25 @@ export default function Productivite() {
       </div>
 
       <div className="card">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-slate-800">Classement des employés</h2>
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-base font-semibold text-ink">Classement des employés</h2>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-border">
           {classement.map((c, i) => (
             <div key={c.name} className="flex items-center gap-4 px-5 py-3">
-              <span className={`w-7 text-center font-semibold ${i < 3 ? medaille[i] : "text-slate-400"}`}>
+              <span className={`w-7 text-center font-semibold ${i < 3 ? medaille[i] : "text-subtle"}`}>
                 {i < 3 ? <Icon name="emoji_events" className="text-[20px]" filled /> : c.rank}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800">{c.name}</p>
-                <p className="text-xs text-slate-400">{c.agence} · {c.worked}</p>
+                <p className="text-sm font-medium text-ink">{c.name}</p>
+                <p className="text-xs text-subtle">{c.agence} · {c.worked}</p>
               </div>
               <div className="w-32 hidden sm:block">
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
                   <div className="h-full bg-brand-500 rounded-full" style={{ width: `${c.productivity}%` }} />
                 </div>
               </div>
-              <span className="font-mono font-semibold text-slate-900 w-12 text-right">{c.productivity} %</span>
+              <span className="font-mono font-semibold text-ink w-12 text-right">{c.productivity} %</span>
             </div>
           ))}
         </div>

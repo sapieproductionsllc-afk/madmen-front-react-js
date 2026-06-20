@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Icon from "../ui/Icon.jsx";
+import Table from "../ui/Table.jsx";
+import Tabs from "../ui/Tabs.jsx";
 import { activity } from "../../data/mockData.js";
 
 // Barres d'activité clavier/souris — animées pour les postes "Actif".
@@ -15,7 +17,7 @@ function BarresActivite({ status }) {
   }, [status]);
 
   const couleur =
-    status === "Incident" ? "bg-rose-400" : status === "Inactif" ? "bg-slate-300" : "bg-brand-500";
+    status === "Incident" ? "bg-rose-400" : status === "Inactif" ? "bg-slate-500" : "bg-brand-500";
 
   if (status === "Inactif") {
     return (
@@ -52,9 +54,9 @@ function BarresActivite({ status }) {
 
 function StatutActivite({ status }) {
   const config = {
-    Actif: { color: "text-emerald-500", text: "text-slate-700", live: true },
-    Inactif: { color: "text-amber-500", text: "text-slate-600", live: false },
-    Incident: { color: "text-rose-500", text: "text-rose-600 font-medium", live: false },
+    Actif: { color: "text-emerald-500", text: "text-texte", live: true },
+    Inactif: { color: "text-amber-500", text: "text-muted", live: false },
+    Incident: { color: "text-rose-500", text: "text-rose-400 font-medium", live: false },
   };
   const c = config[status] ?? config.Inactif;
   return (
@@ -69,15 +71,92 @@ function StatutActivite({ status }) {
   );
 }
 
+const onglets = [
+  { value: "Tous", label: "Tous" },
+  { value: "Actif", label: "Actif" },
+  { value: "Inactif", label: "Inactif" },
+  { value: "Incident", label: "Incident" },
+];
+
 export default function ActivityStream() {
+  const [filtre, setFiltre] = useState("Tous");
+
+  const lignes = useMemo(
+    () => (filtre === "Tous" ? activity : activity.filter((l) => l.status === filtre)),
+    [filtre]
+  );
+
+  const columns = [
+    {
+      key: "name",
+      label: "Employé",
+      sortAccessor: (l) => l.name,
+      render: (l) => <span className="text-sm font-semibold text-texte whitespace-nowrap">{l.name}</span>,
+    },
+    {
+      key: "machine",
+      label: "Machine",
+      render: (l) => (
+        <span className="text-sm font-mono tabular-nums text-subtle whitespace-nowrap">{l.machine}</span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Statut",
+      render: (l) => <StatutActivite status={l.status} />,
+    },
+    {
+      key: "activite",
+      label: "Activité",
+      sortable: false,
+      render: (l) => <BarresActivite status={l.status} />,
+    },
+    {
+      key: "apps",
+      label: "Applications",
+      sortable: false,
+      render: (l) => (
+        <div className="flex gap-1.5">
+          {l.apps.map((app) => (
+            <span
+              key={app}
+              className={`px-2 py-0.5 rounded-md text-[11px] font-medium whitespace-nowrap border ${
+                l.status === "Incident"
+                  ? "bg-rose-400/10 border-rose-400/30 text-rose-400"
+                  : "bg-surface-2 border-border text-muted"
+              }`}
+            >
+              {app}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "worked",
+      label: "Temps",
+      render: (l) => (
+        <span
+          className={`text-sm font-mono tabular-nums whitespace-nowrap ${
+            l.status === "Incident" ? "text-rose-400 font-semibold" : "text-texte"
+          }`}
+        >
+          {l.worked}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="card overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border">
         <div className="flex items-center gap-2.5">
-          <Icon name="desktop_windows" className="text-brand-600 text-[22px]" />
-          <h2 className="text-lg font-semibold text-slate-900 tracking-tight">Flux d'activité en direct</h2>
+          <span className="w-8 h-8 rounded-xl bg-surface-2 text-muted flex items-center justify-center ring-1 ring-inset ring-black/[0.03]">
+            <Icon name="desktop_windows" className="text-[20px]" />
+          </span>
+          <h2 className="text-[1.0625rem] font-semibold text-ink tracking-tight">Flux d'activité en direct</h2>
         </div>
-        <div className="flex items-center gap-4 text-xs text-slate-500">
+        <div className="flex items-center gap-4 text-xs font-medium text-muted">
           <span className="flex items-center gap-1.5">
             <span className="status-dot bg-emerald-500" /> Actif
           </span>
@@ -90,57 +169,19 @@ export default function ActivityStream() {
         </div>
       </div>
 
-      <div className="overflow-x-auto scroll-thin">
-        <table className="w-full text-left border-collapse min-w-[640px]">
-          <thead>
-            <tr className="text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50/60">
-              <th className="px-5 py-2.5 font-medium">Employé</th>
-              <th className="px-5 py-2.5 font-medium">Machine</th>
-              <th className="px-5 py-2.5 font-medium">Statut</th>
-              <th className="px-5 py-2.5 font-medium">Activité</th>
-              <th className="px-5 py-2.5 font-medium">Applications</th>
-              <th className="px-5 py-2.5 font-medium">Temps</th>
-            </tr>
-          </thead>
-          <tbody>
-            {activity.map((ligne) => (
-              <tr key={ligne.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
-                <td className="px-5 py-3 text-sm font-medium text-slate-800 whitespace-nowrap">{ligne.name}</td>
-                <td className="px-5 py-3 text-sm font-mono text-slate-500 whitespace-nowrap">{ligne.machine}</td>
-                <td className="px-5 py-3">
-                  <StatutActivite status={ligne.status} />
-                </td>
-                <td className="px-5 py-3">
-                  <BarresActivite status={ligne.status} />
-                </td>
-                <td className="px-5 py-3">
-                  <div className="flex gap-1.5">
-                    {ligne.apps.map((app) => (
-                      <span
-                        key={app}
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-medium whitespace-nowrap border ${
-                          ligne.status === "Incident"
-                            ? "bg-rose-50 border-rose-100 text-rose-600"
-                            : "bg-slate-50 border-slate-200 text-slate-600"
-                        }`}
-                      >
-                        {app}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td
-                  className={`px-5 py-3 text-sm font-mono whitespace-nowrap ${
-                    ligne.status === "Incident" ? "text-rose-600 font-medium" : "text-slate-700"
-                  }`}
-                >
-                  {ligne.worked}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Toolbar de filtrage en place */}
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-border">
+        <Tabs tabs={onglets} active={filtre} onChange={setFiltre} />
       </div>
+
+      <Table
+        columns={columns}
+        data={lignes}
+        rowKey={(l) => l.id}
+        minWidth={640}
+        sortable
+        emptyLabel="Aucun poste pour ce filtre."
+      />
     </div>
   );
 }

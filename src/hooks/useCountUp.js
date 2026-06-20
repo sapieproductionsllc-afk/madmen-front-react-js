@@ -7,6 +7,18 @@ export default function useCountUp(target, { duration = 1200 } = {}) {
 
   useEffect(() => {
     const to = Number(target) || 0;
+
+    // Accessibilité : si l'utilisateur a désactivé les animations, on pose
+    // directement la valeur finale (pas de flood de re-renders via rAF).
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setValue(to);
+      return undefined;
+    }
+
     let start;
 
     const tick = (t) => {

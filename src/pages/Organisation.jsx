@@ -13,10 +13,10 @@ export default function Organisation() {
   const [onglet, setOnglet] = useState("agences");
 
   const colonnesDep = [
-    { key: "name", label: "Département", render: (d) => <span className="font-medium text-slate-800">{d.name}</span> },
-    { key: "lead", label: "Responsable", render: (d) => <span className="text-slate-600">{d.lead}</span> },
-    { key: "agence", label: "Agence", render: (d) => <span className="text-slate-600">{d.agence}</span> },
-    { key: "headcount", label: "Effectif", align: "right", render: (d) => <span className="font-mono font-medium text-slate-800">{d.headcount}</span> },
+    { key: "name", label: "Département", render: (d) => <span className="font-medium text-ink">{d.name}</span> },
+    { key: "lead", label: "Responsable", render: (d) => <span className="text-texte">{d.lead}</span> },
+    { key: "agence", label: "Agence", render: (d) => <span className="text-texte">{d.agence}</span> },
+    { key: "headcount", label: "Effectif", align: "right", render: (d) => <span className="font-mono font-medium text-ink">{d.headcount}</span> },
   ];
 
   return (
@@ -49,18 +49,18 @@ export default function Organisation() {
                     <Icon name="apartment" className="text-[24px]" />
                   </span>
                   <div>
-                    <p className="font-semibold text-slate-800">{a.name}</p>
-                    <p className="text-xs text-slate-400">{a.zone}</p>
+                    <p className="font-semibold text-ink">{a.name}</p>
+                    <p className="text-xs text-subtle">{a.zone}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-slate-50 p-3">
-                    <p className="text-xs text-slate-400">Effectif</p>
-                    <p className="text-lg font-semibold text-slate-900 tabular-nums">{a.employees}</p>
+                  <div className="rounded-xl bg-surface-2 p-3">
+                    <p className="text-xs text-subtle">Effectif</p>
+                    <p className="text-lg font-semibold text-ink tabular-nums">{a.employees}</p>
                   </div>
-                  <div className="rounded-xl bg-slate-50 p-3">
-                    <p className="text-xs text-slate-400">Présence</p>
-                    <p className="text-lg font-semibold text-emerald-600 tabular-nums">{taux} %</p>
+                  <div className="rounded-xl bg-surface-2 p-3">
+                    <p className="text-xs text-subtle">Présence</p>
+                    <p className="text-lg font-semibold text-emerald-400 tabular-nums">{taux} %</p>
                   </div>
                 </div>
               </div>

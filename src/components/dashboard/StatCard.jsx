@@ -3,12 +3,12 @@ import useCountUp from "../../hooks/useCountUp.js";
 
 // Pastille d'icône colorée selon le thème de la carte
 const chips = {
-  indigo: "bg-brand-50 text-brand-600",
-  emerald: "bg-emerald-50 text-emerald-600",
-  violet: "bg-violet-50 text-violet-600",
-  rose: "bg-rose-50 text-rose-600",
-  amber: "bg-amber-50 text-amber-600",
-  sky: "bg-sky-50 text-sky-600",
+  indigo: "bg-brand-500/15 text-brand-400",
+  emerald: "bg-emerald-500/15 text-emerald-300",
+  violet: "bg-violet-500/15 text-violet-300",
+  rose: "bg-rose-500/15 text-rose-300",
+  amber: "bg-amber-500/15 text-amber-300",
+  sky: "bg-sky-500/15 text-sky-300",
 };
 
 function formatNombre(n, decimals) {
@@ -23,14 +23,18 @@ export default function StatCard({ icon, label, count, decimals = 0, suffix = ""
 
   return (
     <div className="card card-hover p-5 h-full">
-      <div className="flex items-center justify-between mb-4">
-        <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${chips[color] ?? chips.indigo}`}>
+      <div className="flex items-center justify-between mb-5">
+        <span
+          className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset ring-black/[0.03] ${
+            chips[color] ?? chips.indigo
+          }`}
+        >
           <Icon name={icon} className="text-[22px]" />
         </span>
         {trend && (
           <span
-            className={`inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-semibold ${
-              trend.dir === "up" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+            className={`inline-flex items-center gap-0.5 pl-1.5 pr-2 py-1 rounded-full text-xs font-semibold tabular-nums ${
+              trend.dir === "up" ? "bg-emerald-500/10 text-emerald-700" : "bg-rose-500/10 text-rose-700"
             }`}
           >
             <Icon name={trend.dir === "up" ? "arrow_upward" : "arrow_downward"} className="text-[14px]" />
@@ -39,12 +43,12 @@ export default function StatCard({ icon, label, count, decimals = 0, suffix = ""
         )}
       </div>
 
-      <p className="text-[2rem] md:text-[2.25rem] font-semibold tracking-tight tabular-nums text-slate-900 leading-none">
+      <p className="text-[2rem] md:text-[2.25rem] font-semibold tracking-tight tabular-nums text-ink leading-none">
         {formatNombre(anime, decimals)}
-        {suffix && <span className="text-2xl text-slate-400">{suffix}</span>}
+        {suffix && <span className="text-2xl text-faint font-medium">{suffix}</span>}
       </p>
-      <p className="mt-2 text-sm font-medium text-slate-600">{label}</p>
-      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      <p className="mt-2.5 text-sm font-semibold text-texte">{label}</p>
+      {sub && <p className="text-xs text-subtle mt-1">{sub}</p>}
     </div>
   );
 }

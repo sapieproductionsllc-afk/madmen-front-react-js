@@ -2,12 +2,12 @@ import { useState } from "react";
 
 // Couleurs d'avatar (initiales) déterministes selon le nom.
 const couleurs = [
-  "bg-brand-50 text-brand-600",
-  "bg-emerald-50 text-emerald-600",
-  "bg-amber-50 text-amber-600",
-  "bg-rose-50 text-rose-600",
-  "bg-sky-50 text-sky-600",
-  "bg-violet-50 text-violet-600",
+  "bg-brand-500/15 text-brand-400",
+  "bg-emerald-500/15 text-emerald-300",
+  "bg-amber-500/15 text-amber-300",
+  "bg-rose-500/15 text-rose-300",
+  "bg-sky-500/15 text-sky-300",
+  "bg-violet-500/15 text-violet-300",
 ];
 
 export default function Avatar({ src, name = "", size = "w-9 h-9", className = "" }) {
@@ -22,7 +22,7 @@ export default function Avatar({ src, name = "", size = "w-9 h-9", className = "
     .toUpperCase();
 
   const indice = name.length % couleurs.length;
-  const base = `${size} rounded-full overflow-hidden ring-1 ring-slate-200 shrink-0 ${className}`;
+  const base = `${size} rounded-full overflow-hidden ring-1 ring-border-strong shrink-0 ${className}`;
 
   if (src && !erreur) {
     return (

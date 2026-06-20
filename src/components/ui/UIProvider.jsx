@@ -18,9 +18,9 @@ const toastTones = {
 function Toast({ message, type }) {
   const t = toastTones[type] ?? toastTones.success;
   return (
-    <div className="toast-in flex items-center gap-3 bg-white border border-slate-200 shadow-lift rounded-xl px-4 py-3 min-w-[260px] max-w-sm">
+    <div className="toast-in flex items-center gap-3 bg-surface border border-border shadow-lift rounded-xl px-4 py-3 min-w-[260px] max-w-sm">
       <Icon name={t.icon} className={`text-[20px] ${t.cls}`} filled />
-      <span className="text-sm text-slate-700">{message}</span>
+      <span className="text-sm text-texte">{message}</span>
     </div>
   );
 }
@@ -29,6 +29,7 @@ export function UIProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const [confirmState, setConfirmState] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [agence, setAgence] = useState("Toutes les agences");
 
   const toast = useCallback((message, type = "success") => {
     const id = ++TOAST_ID;
@@ -42,7 +43,7 @@ export function UIProvider({ children }) {
   const fermerConfirm = () => setConfirmState(null);
 
   return (
-    <UICtx.Provider value={{ toast, confirm, openAddEmployee }}>
+    <UICtx.Provider value={{ toast, confirm, openAddEmployee, agence, setAgence }}>
       {children}
 
       {/* Notifications */}
@@ -77,7 +78,7 @@ export function UIProvider({ children }) {
           </>
         }
       >
-        <p className="text-sm text-slate-600">{confirmState?.message}</p>
+        <p className="text-sm text-texte">{confirmState?.message}</p>
       </Modal>
 
       {/* Ajout d'employé (global) */}

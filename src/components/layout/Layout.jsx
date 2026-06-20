@@ -8,14 +8,14 @@ export default function Layout() {
   const [menuOuvert, setMenuOuvert] = useState(false);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-canvas text-slate-900">
+    <div className="h-screen flex flex-col overflow-hidden bg-canvas text-texte">
       <TopNav onMenuClick={() => setMenuOuvert(true)} />
 
       <div className="flex flex-1 overflow-hidden">
         <SideNav open={menuOuvert} onClose={() => setMenuOuvert(false)} />
 
         <main className="flex-1 overflow-y-auto scroll-thin">
-          <div className="max-w-content mx-auto px-4 md:px-8 py-6 md:py-8">
+          <div className="max-w-content mx-auto px-5 md:px-8 py-6 md:py-8">
             <Outlet />
           </div>
         </main>

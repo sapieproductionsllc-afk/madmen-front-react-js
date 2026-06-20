@@ -8,9 +8,9 @@ import { useUI } from "../components/ui/UIProvider.jsx";
 import { alertes as donnees } from "../data/datasets.js";
 
 const config = {
-  Critique: { tone: "rose", icon: "gpp_bad", chip: "bg-rose-50 text-rose-600" },
-  Moyen: { tone: "amber", icon: "warning", chip: "bg-amber-50 text-amber-600" },
-  Faible: { tone: "slate", icon: "info", chip: "bg-slate-100 text-slate-500" },
+  Critique: { tone: "rose", icon: "gpp_bad", chip: "bg-rose-500/15 text-rose-400" },
+  Moyen: { tone: "amber", icon: "warning", chip: "bg-amber-500/15 text-amber-400" },
+  Faible: { tone: "slate", icon: "info", chip: "bg-slate-500/15 text-slate-400" },
 };
 
 export default function Alertes() {
@@ -55,12 +55,12 @@ export default function Alertes() {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="text-sm font-semibold text-slate-800">{a.type}</span>
+                  <span className="text-sm font-semibold text-ink">{a.type}</span>
                   <StatusPill label={a.severity} tone={c.tone} dot={false} />
                   {!lu && <span className="w-2 h-2 rounded-full bg-brand-500" />}
                 </div>
-                <p className="text-sm text-slate-600">{a.message}</p>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-400">
+                <p className="text-sm text-texte">{a.message}</p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-subtle">
                   <span className="flex items-center gap-1"><Icon name="person" className="text-[14px]" />{a.employe}</span>
                   <span className="flex items-center gap-1"><Icon name="apartment" className="text-[14px]" />{a.agence}</span>
                   <span className="flex items-center gap-1"><Icon name="dvr" className="text-[14px]" />{a.machine}</span>

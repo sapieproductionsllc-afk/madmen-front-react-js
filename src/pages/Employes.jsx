@@ -16,10 +16,10 @@ const tonePourStatut = { Actif: "emerald", Congé: "amber", Suspendu: "rose" };
 
 function LigneDetail({ icon, label, value }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-slate-100 last:border-0">
-      <Icon name={icon} className="text-slate-400 text-[20px]" />
-      <span className="text-sm text-slate-500 w-32 shrink-0">{label}</span>
-      <span className="text-sm text-slate-800 font-medium">{value}</span>
+    <div className="flex items-center gap-3 py-2.5 border-b border-border last:border-0">
+      <Icon name={icon} className="text-subtle text-[20px]" />
+      <span className="text-sm text-muted w-32 shrink-0">{label}</span>
+      <span className="text-sm text-ink font-medium">{value}</span>
     </div>
   );
 }
@@ -61,14 +61,14 @@ export default function Employes() {
         <div className="flex items-center gap-3">
           <Avatar name={e.name} size="w-8 h-8" />
           <div>
-            <p className="text-sm font-medium text-slate-800">{e.name}</p>
-            <p className="text-xs text-slate-400 font-mono">{e.id}</p>
+            <p className="text-sm font-medium text-ink">{e.name}</p>
+            <p className="text-xs text-subtle font-mono">{e.id}</p>
           </div>
         </div>
       ),
     },
-    { key: "fonction", label: "Fonction", render: (e) => <span className="text-slate-600">{e.fonction}</span> },
-    { key: "agence", label: "Agence", render: (e) => <span className="text-slate-600">{e.agence}</span> },
+    { key: "fonction", label: "Fonction", render: (e) => <span className="text-texte">{e.fonction}</span> },
+    { key: "agence", label: "Agence", render: (e) => <span className="text-texte">{e.agence}</span> },
     { key: "status", label: "Statut", render: (e) => <StatusPill label={e.status} tone={tonePourStatut[e.status]} /> },
     {
       key: "actions",
@@ -81,7 +81,7 @@ export default function Employes() {
           </Button>
           <button
             onClick={() => suspendre(e)}
-            className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg p-1.5 transition-colors"
+            className="text-subtle hover:text-rose-400 hover:bg-rose-500/15 rounded-lg p-1.5 transition-colors"
             title="Suspendre"
           >
             <Icon name="block" className="text-[18px]" />
@@ -110,7 +110,7 @@ export default function Employes() {
       </div>
 
       <div className="card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b border-border">
           <Tabs
             tabs={[
               { label: "Tous", value: "Tous" },
@@ -144,7 +144,7 @@ export default function Employes() {
             <div className="flex items-center gap-4 mb-5">
               <Avatar name={detail.name} size="w-16 h-16" />
               <div>
-                <p className="text-lg font-semibold text-slate-900">{detail.name}</p>
+                <p className="text-lg font-semibold text-ink">{detail.name}</p>
                 <StatusPill label={detail.status} tone={tonePourStatut[detail.status]} />
               </div>
             </div>
