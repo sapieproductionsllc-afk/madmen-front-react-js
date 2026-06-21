@@ -59,7 +59,7 @@ export default function Employes() {
           <p className="mt-2 text-sm text-muted">Aucun agent ne correspond.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[18px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
           {liste.map((e) => (
             <CarteAnnuaire key={e.id} e={e} />
           ))}

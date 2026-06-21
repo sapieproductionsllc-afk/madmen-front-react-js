@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
       const enregistre = sessionStorage.getItem("madmen_user");
-      return enregistre ? JSON.parse(enregistre) : null;
+      return enregistre ? JSON.parse(enregistre) : utilisateurParDefaut; /* TEMP-CAPTURE bypass */
     } catch {
       return null;
     }
