@@ -8,7 +8,7 @@ const photoDe = (id) => `https://i.pravatar.cc/240?u=${encodeURIComponent(id)}`;
 // Statut administratif (annuaire) → anneau coloré + icône (forme discriminante,
 // indépendante de la couleur). vert = actif · or = congé · bleu = vacances · rouge = maladie.
 const STATUT = {
-  Actif: { label: "Actif", ring: "ring-emerald-500", dot: "bg-emerald-500", pill: "bg-emerald-50 text-emerald-700", icon: "check", pulse: true },
+  Actif: { label: "Actif", ring: "ring-emerald-500", dot: "bg-emerald-500", pill: "bg-emerald-50 text-emerald-700", icon: "check", pulse: false },
   "En congé": { label: "En congé", ring: "ring-or-500", dot: "bg-or-600", pill: "bg-or-100 text-or-700", icon: "weekend", pulse: false },
   "En vacances": { label: "En vacances", ring: "ring-sky-500", dot: "bg-sky-500", pill: "bg-sky-50 text-sky-700", icon: "beach_access", pulse: false },
   "Pause maladie": { label: "Pause maladie", ring: "ring-rose-500", dot: "bg-rose-500", pill: "bg-rose-50 text-rose-700", icon: "medical_services", pulse: false },
@@ -55,12 +55,11 @@ export default function CarteAnnuaire({ e }) {
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold text-ink truncate leading-tight group-hover:text-or-700 transition-colors">{e.name}</p>
         <p className="mt-0.5 text-xs text-muted truncate">{e.fonction}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-bold ${s.pill}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} aria-hidden="true" />
+        <div className="mt-2 flex items-center gap-2 min-w-0">
+          <span className={`inline-flex items-center shrink-0 rounded-full px-2.5 py-1 text-[12.5px] font-bold ${s.pill}`}>
             {s.label}
           </span>
-          <span className="inline-flex items-center gap-1 text-[12px] text-muted min-w-0">
+          <span className="inline-flex items-center gap-1 text-[12px] text-muted min-w-0 flex-1">
             <Icon name="location_on" className="text-[14px] text-faint shrink-0" />
             <span className="truncate">{e.agence}</span>
           </span>

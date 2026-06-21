@@ -31,7 +31,7 @@ export default function Employes() {
 
   return (
     <div className="space-y-5 pb-12">
-      <PageHeader title="Agents" subtitle="Tous vos employés — fiches d'identité et ancienneté.">
+      <PageHeader title="Agents" subtitle="Annuaire du personnel — statut et affectation par agence.">
         <Button icon="person_add" onClick={openAddEmployee}>
           Ajouter un agent
         </Button>
@@ -59,7 +59,7 @@ export default function Employes() {
           <p className="mt-2 text-sm text-muted">Aucun agent ne correspond.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {liste.map((e) => (
             <CarteAnnuaire key={e.id} e={e} />
           ))}
