@@ -13,17 +13,13 @@ const navGroups = [
   },
   {
     title: "Personnel",
-    items: [
-      { label: "Employés", icon: "groups", to: "/employes" },
-      { label: "Organisation", icon: "apartment", to: "/organisation" },
-    ],
+    items: [{ label: "Agents", icon: "groups", to: "/employes" }],
   },
   {
     title: "Temps & Activité",
     items: [
       { label: "Présence & Pointage", icon: "co_present", to: "/presence" },
-      { label: "Activité des postes", icon: "desktop_windows", to: "/activite" },
-      { label: "Productivité", icon: "trending_up", to: "/productivite" },
+      { label: "Activité", icon: "desktop_windows", to: "/activite" },
     ],
   },
   {
@@ -59,13 +55,13 @@ function LienNav({ item, onNavigate }) {
           {/* Barre d'accent taupe à gauche (état actif) */}
           <span
             aria-hidden="true"
-            className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-sand transition-opacity duration-150 ${
+            className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-or-400 transition-opacity duration-150 ${
               isActive ? "opacity-100" : "opacity-0"
             }`}
           />
           <Icon
             name={item.icon}
-            className={`text-[20px] transition-colors ${isActive ? "text-sand" : "text-white/55 group-hover:text-white/85"}`}
+            className={`text-[20px] transition-colors ${isActive ? "text-or-300" : "text-white/55 group-hover:text-white/85"}`}
             filled={isActive}
           />
           <span className="truncate">{item.label}</span>

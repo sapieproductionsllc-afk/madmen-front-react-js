@@ -5,8 +5,8 @@ import Layout from "./components/layout/Layout.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Employes from "./pages/Employes.jsx";
+import ProfilEmploye from "./pages/ProfilEmploye.jsx";
 import Enrolement from "./pages/Enrolement.jsx";
-import Organisation from "./pages/Organisation.jsx";
 import Presence from "./pages/Presence.jsx";
 import Activite from "./pages/Activite.jsx";
 import Productivite from "./pages/Productivite.jsx";
@@ -36,8 +36,8 @@ export default function App() {
             <Route path="rapports" element={<Rapports />} />
             <Route path="alertes" element={<Alertes />} />
             <Route path="employes" element={<Employes />} />
+            <Route path="employes/:id" element={<ProfilEmploye />} />
             <Route path="enrolement" element={<Enrolement />} />
-            <Route path="organisation" element={<Organisation />} />
             <Route path="presence" element={<Presence />} />
             <Route path="activite" element={<Activite />} />
             <Route path="productivite" element={<Productivite />} />

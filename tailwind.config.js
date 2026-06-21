@@ -24,6 +24,19 @@ export default {
         canvas: "#f7f4e9", // crème (fond général)
         surface: "#ffffff", // cartes / panneaux
         "surface-2": "#f0ead9", // surfaces surélevées / hover / en-têtes doux
+        // OR / doré signature — couleur d'ACTION dominante (CTA, KPI, menu actif, actions importantes).
+        or: {
+          50: "#fbf6e9",
+          100: "#f5e9c6",
+          200: "#ecd596",
+          300: "#e2bd5e",
+          400: "#d6a534",
+          500: "#c8941f", // doré signature
+          600: "#a8791a",
+          700: "#855e18",
+          800: "#6b4c19",
+          900: "#5a4019",
+        },
         // Taupe officiel (accents chauds : en-têtes de tableau, blocs secondaires, badges)
         sand: "#d2be9b",
         "sand-soft": "#e7dcc4",

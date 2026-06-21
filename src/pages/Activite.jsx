@@ -1,74 +1,74 @@
+import { useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
-import StatTile from "../components/ui/StatTile.jsx";
-import Table from "../components/ui/Table.jsx";
+import SearchInput from "../components/ui/SearchInput.jsx";
 import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
+import CarteActivite from "../components/ui/CarteActivite.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { activity } from "../data/mockData.js";
+import { employes, tempsReel, ordreLive } from "../data/datasets.js";
 
-const statut = {
-  Actif: { tone: "text-emerald-600", label: "text-texte" },
-  Inactif: { tone: "text-amber-600", label: "text-texte" },
-  Incident: { tone: "text-rose-600", label: "text-rose-600 font-medium" },
-};
+const liveDe = (e) => tempsReel[e.id]?.live ?? "Absent";
+
+const cats = [
+  { key: "Tous", test: () => true },
+  { key: "Actifs", test: (e) => liveDe(e) === "En activité" },
+  { key: "En pause", test: (e) => liveDe(e) === "En pause" },
+  { key: "Hors ligne", test: (e) => ["Absent", "Congé"].includes(liveDe(e)) },
+];
 
 export default function Activite() {
   const { toast } = useUI();
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("Tous");
 
-  const colonnes = [
-    { key: "name", label: "Employé", render: (l) => <span className="font-medium text-ink">{l.name}</span> },
-    { key: "machine", label: "Machine", render: (l) => <span className="font-mono text-muted">{l.machine}</span> },
-    { key: "agence", label: "Agence", render: (l) => <span className="text-texte">{l.agence}</span> },
-    {
-      key: "status",
-      label: "Statut",
-      render: (l) => {
-        const s = statut[l.status] ?? statut.Inactif;
-        return (
-          <span className={`inline-flex items-center gap-2 ${s.label}`}>
-            <span className={`material-symbols-rounded text-[10px] ${s.tone}`} style={{ fontVariationSettings: "'FILL' 1" }}>circle</span>
-            {l.status}
-          </span>
-        );
-      },
-    },
-    {
-      key: "apps",
-      label: "Applications",
-      render: (l) => (
-        <div className="flex gap-1.5">
-          {l.apps.map((a) => (
-            <span key={a} className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 border border-border text-texte">
-              {a}
-            </span>
-          ))}
-        </div>
-      ),
-    },
-    { key: "worked", label: "Temps travaillé", align: "right", render: (l) => <span className="font-mono font-medium text-texte">{l.worked}</span> },
-  ];
+  const compte = (k) => employes.filter(cats.find((c) => c.key === k).test).length;
+
+  const liste = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    const test = cats.find((c) => c.key === cat).test;
+    return employes
+      .filter((e) => test(e) && (!t || e.name.toLowerCase().includes(t) || e.id.toLowerCase().includes(t) || e.fonction.toLowerCase().includes(t) || e.department.toLowerCase().includes(t)))
+      .sort((a, b) => (ordreLive[liveDe(a)] ?? 9) - (ordreLive[liveDe(b)] ?? 9));
+  }, [q, cat]);
 
   return (
-    <div>
-      <PageHeader title="Activité des postes" subtitle="Surveillance de l'activité et détection d'inactivité (seuil 5 min).">
-        <Button variant="secondary" icon="refresh" onClick={() => toast("Données actualisées", "info")}>
+    <div className="space-y-5 pb-12">
+      <PageHeader title="Activité" subtitle="Activité des postes en temps réel.">
+        <Button variant="secondary" icon="refresh" onClick={() => toast("Activité actualisée", "success")}>
           Actualiser
         </Button>
       </PageHeader>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatTile icon="bolt" label="Postes actifs" value="612" color="emerald" />
-        <StatTile icon="snooze" label="Inactifs" value="192" color="amber" />
-        <StatTile icon="lock" label="Verrouillés" value="37" color="violet" />
-        <StatTile icon="report" label="Incidents" value="3" color="rose" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto scroll-thin pb-1 sm:pb-0">
+          {cats.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setCat(c.key)}
+              className={`shrink-0 inline-flex items-center gap-2 pl-3 pr-2 h-9 rounded-full text-sm whitespace-nowrap border transition-colors ${
+                cat === c.key ? "bg-brand-600 text-canvas border-brand-600" : "bg-surface text-muted border-border hover:border-border-strong hover:text-texte"
+              }`}
+            >
+              {c.key}
+              <span className={`text-xs font-semibold tabular-nums px-1.5 py-0.5 rounded-full ${cat === c.key ? "bg-canvas/20 text-canvas" : "bg-surface-2 text-texte"}`}>{compte(c.key)}</span>
+            </button>
+          ))}
+        </div>
+        <SearchInput value={q} onChange={setQ} placeholder="Rechercher un agent…" className="sm:ml-auto sm:w-72" />
       </div>
 
-      <div className="card">
-        <div className="px-5 py-4 border-b border-border">
-          <h2 className="text-base font-semibold text-ink">Flux d'activité en direct</h2>
+      {liste.length === 0 ? (
+        <div className="card py-16 text-center">
+          <Icon name="search_off" className="text-faint text-[40px]" />
+          <p className="mt-2 text-sm text-muted">Aucun agent ne correspond.</p>
         </div>
-        <Table columns={colonnes} data={activity} rowKey={(l) => l.id} />
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+          {liste.map((e) => (
+            <CarteActivite key={e.id} e={e} tr={tempsReel[e.id]} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

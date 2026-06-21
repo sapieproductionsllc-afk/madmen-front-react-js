@@ -1,8 +1,9 @@
 import Icon from "./Icon.jsx";
 
 const variants = {
-  primary: "bg-brand-600 text-canvas hover:bg-brand-700 shadow-sm",
-  secondary: "bg-surface-2 text-texte border border-border-strong hover:border-brand-600/50 hover:text-ink",
+  primary: "bg-or-500 text-ink hover:bg-or-600 shadow-sm", // doré : action dominante
+  brand: "bg-brand-600 text-canvas hover:bg-brand-700 shadow-sm", // canard : action structurelle
+  secondary: "bg-surface-2 text-texte border border-border-strong hover:border-or-500/60 hover:text-ink",
   ghost: "text-muted hover:bg-surface-2 hover:text-texte",
   danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm",
   "danger-soft": "bg-rose-50 text-rose-600 hover:bg-rose-100",

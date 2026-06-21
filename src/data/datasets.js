@@ -119,5 +119,38 @@ export const demandes = [
 // Index rapide matricule → demande en attente.
 export const demandeParEmploye = Object.fromEntries(demandes.map((d) => [d.employeId, d]));
 
+// ---------------------------------------------------------------------------
+// VUE CENTRÉE AGENTS — statut temps réel + dernière activité (lié par matricule)
+// ---------------------------------------------------------------------------
+export const tempsReel = {
+  "AUR-8821": { live: "En activité", detail: "Connectée · poste WS-042-ALPHA", depuis: "à l'instant" },
+  "AUR-4491": { live: "Congé", detail: "Congé approuvé jusqu'au 24 juin", depuis: "—" },
+  "AUR-1102": { live: "En activité", detail: "Session active · poste WS-119-BETA", depuis: "il y a 2 min" },
+  "AUR-9031": { live: "Absent", detail: "Aucun pointage aujourd'hui", depuis: "—" },
+  "AUR-7720": { live: "En pause", detail: "Pause déjeuner", depuis: "il y a 18 min" },
+  "AUR-6654": { live: "En activité", detail: "Connectée · poste WS-014", depuis: "il y a 5 min" },
+  "AUR-3398": { live: "En activité", detail: "Intervention support · poste WS-205", depuis: "il y a 1 min" },
+  "AUR-2241": { live: "En pause", detail: "Pause café", depuis: "il y a 7 min" },
+  "AUR-5567": { live: "En activité", detail: "Réunion projet · salle B2", depuis: "il y a 12 min" },
+  "AUR-8843": { live: "Congé", detail: "Congé approuvé jusqu'au 22 juin", depuis: "—" },
+  "AUR-1190": { live: "Absent", detail: "Absence justifiée · RDV médical", depuis: "—" },
+  "AUR-7012": { live: "En activité", detail: "Maquettage · poste WS-208", depuis: "il y a 3 min" },
+};
+
+// Statut live → tonalité de badge (vert / ambre / rouge / bleu)
+export const toneLive = { "En activité": "emerald", "En pause": "amber", "Absent": "rose", "Congé": "sky" };
+export const ordreLive = { "En activité": 0, "En pause": 1, "Absent": 2, "Congé": 3 };
+
+// Flux d'activité récente (panneau droit du dashboard).
+export const activiteRecente = [
+  { time: "09:24", name: "Karim Benali", action: "Pointage d'entrée", icon: "login", tone: "emerald" },
+  { time: "09:18", name: "Léa Fontaine", action: "Début de pause", icon: "local_cafe", tone: "amber" },
+  { time: "09:05", name: "Julian Rossi", action: "Entrée (retard +17 min)", icon: "login", tone: "rose" },
+  { time: "08:47", name: "David Mercier", action: "Reprise d'activité", icon: "play_circle", tone: "emerald" },
+  { time: "08:33", name: "Amélie Dubois", action: "Pointage d'entrée", icon: "login", tone: "emerald" },
+  { time: "08:30", name: "Paul Lefèvre", action: "Absence signalée", icon: "event_busy", tone: "rose" },
+  { time: "08:20", name: "Thomas Girard", action: "Pointage d'entrée", icon: "login", tone: "emerald" },
+];
+
 // Source unique du compteur d'alertes (utilisé par le menu latéral ET le header)
 export const alertesNonLues = alertes.filter((a) => !a.read).length;

@@ -157,7 +157,7 @@ export default function TopNav({ onMenuClick }) {
                   {resAgences.map((a) => (
                     <button
                       key={a}
-                      onClick={() => { setQuery(""); setSearchOpen(false); choisirAgence(a); navigate("/organisation"); }}
+                      onClick={() => { setQuery(""); setSearchOpen(false); choisirAgence(a); navigate("/"); }}
                       className="w-full flex items-center gap-3 px-4 py-2 hover:bg-surface-2 text-left transition-colors"
                     >
                       <span className="w-7 h-7 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
