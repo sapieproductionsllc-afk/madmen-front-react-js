@@ -73,8 +73,8 @@ export default function Parametres() {
             <Champ label="Tolérance de retard (minutes)">
               <Input type="number" defaultValue={5} />
             </Champ>
-            <Champ label="Retenue par minute de retard (€)">
-              <Input type="number" defaultValue={2} />
+            <Champ label="Retenue par minute de retard (FCFA)">
+              <Input type="number" defaultValue={300} />
             </Champ>
             <label className="flex items-center justify-between">
               <span className="text-sm text-texte">Retenue automatique sur salaire</span>

@@ -18,7 +18,7 @@ function smoothPath(points) {
   return d.join(" ");
 }
 
-function AreaChart({ data = [], height = 130, color = "#1a535c", id = "area", dots = false }) {
+function AreaChart({ data = [], height = 130, color = "#1f4a3a", id = "area", dots = false }) {
   // Le tracé ne dépend que de `data` : mémoïsé pour éviter ~80 recalculs SVG
   // pendant le count-up (qui re-rend le parent à ~60 fps).
   const geometry = useMemo(() => {

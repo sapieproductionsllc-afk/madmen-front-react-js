@@ -10,7 +10,7 @@ const couleurs = [
   "bg-slate-50 text-slate-700",
 ];
 
-export default function Avatar({ src, name = "", size = "w-9 h-9", className = "" }) {
+export default function Avatar({ src, name = "", size = "w-9 h-9", textSize = "text-xs", ring = true, className = "" }) {
   const [erreur, setErreur] = useState(false);
 
   const initiales = name
@@ -22,7 +22,7 @@ export default function Avatar({ src, name = "", size = "w-9 h-9", className = "
     .toUpperCase();
 
   const indice = name.length % couleurs.length;
-  const base = `${size} rounded-full overflow-hidden ring-1 ring-border-strong shrink-0 ${className}`;
+  const base = `${size} rounded-full overflow-hidden ${ring ? "ring-1 ring-border-strong" : ""} shrink-0 ${className}`;
 
   if (src && !erreur) {
     return (
@@ -40,7 +40,7 @@ export default function Avatar({ src, name = "", size = "w-9 h-9", className = "
 
   return (
     <div
-      className={`${base} flex items-center justify-center text-xs font-semibold ${couleurs[indice]}`}
+      className={`${base} flex items-center justify-center ${textSize} font-semibold ${couleurs[indice]}`}
     >
       {initiales || "?"}
     </div>

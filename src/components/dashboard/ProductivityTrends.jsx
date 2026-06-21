@@ -31,7 +31,7 @@ export default function ProductivityTrends() {
       </div>
 
       {/* Courbe lissée sur 12 jours */}
-      <AreaChart data={productivity.series} height={128} id="prod" color="#1a535c" />
+      <AreaChart data={productivity.series} height={128} id="prod" color="#1f4a3a" />
 
       <div className="grid grid-cols-2 gap-3 mt-5">
         <div className="rounded-xl bg-surface-2 border border-border p-3.5">

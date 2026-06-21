@@ -26,6 +26,16 @@ function anciennete(dateStr) {
   return an >= 1 ? { val: an, unite: an > 1 ? "ans" : "an" } : { val: Math.max(mo, 0), unite: "mois" };
 }
 
+// Âge à partir de la date de naissance.
+function age(dateStr) {
+  if (!dateStr) return null;
+  const [j, m, y] = dateStr.split("/").map(Number);
+  const now = new Date();
+  let a = now.getFullYear() - y;
+  if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < j)) a--;
+  return a;
+}
+
 function Ligne({ icon, value, lead }) {
   return (
     <div className={`flex items-center gap-2.5 min-w-0 ${lead ? "text-ink font-semibold" : "text-muted"}`}>
@@ -39,8 +49,10 @@ function Ligne({ icon, value, lead }) {
 export default function CarteAnnuaire({ e }) {
   const navigate = useNavigate();
   const s = statutMap[e.status] ?? statutMap.Actif;
-  const embauche = employeDetails[e.id]?.embauche;
+  const d = employeDetails[e.id] ?? {};
+  const embauche = d.embauche;
   const anc = anciennete(embauche);
+  const chip = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[11px] text-muted";
 
   return (
     <article className={`card flex flex-col p-[18px] border-t-[4px] ${s.bar} hover:-translate-y-0.5 hover:shadow-lift transition-all`}>
@@ -62,8 +74,23 @@ export default function CarteAnnuaire({ e }) {
         </span>
       </div>
 
+      {/* Infos personnelles */}
+      <div className="flex flex-wrap gap-1.5 mt-2.5">
+        {(d.sexe || d.naissance) && (
+          <span className={chip}>
+            <Icon name={d.sexe === "Femme" ? "female" : "male"} className="text-[13px] text-muted" />
+            {[d.sexe, d.naissance ? `${age(d.naissance)} ans` : null].filter(Boolean).join(" · ")}
+          </span>
+        )}
+        {d.residence && (
+          <span className={chip}>
+            <Icon name="home" className="text-[13px] text-muted" /> {d.residence}
+          </span>
+        )}
+      </div>
+
       {/* Méta */}
-      <div className="grid gap-2 my-[15px] pt-3.5 border-t border-hair text-[13px]">
+      <div className="grid gap-2 mt-3 mb-[15px] pt-3.5 border-t border-border text-[13px]">
         <Ligne icon="work" value={e.fonction} lead />
         <Ligne icon="domain" value={e.department} />
         <Ligne icon="location_on" value={e.agence} />
@@ -72,7 +99,7 @@ export default function CarteAnnuaire({ e }) {
       </div>
 
       {/* Ancienneté */}
-      <div className="rounded-xl bg-[#f3f6ee] border border-hair px-3.5 py-3 flex items-center justify-between gap-2.5">
+      <div className="rounded-xl bg-[#f3f6ee] border border-border px-3.5 py-3 flex items-center justify-between gap-2.5">
         <div className="min-w-0">
           <p className="text-[11px] text-muted">Dans l'entreprise depuis</p>
           <p className="text-[13.5px] font-bold tabular-nums text-ink mt-0.5">{embauche ?? "—"}</p>

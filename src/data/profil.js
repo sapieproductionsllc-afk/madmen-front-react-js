@@ -5,21 +5,21 @@ import { employes, paie } from "./datasets.js";
 const empById = Object.fromEntries(employes.map((e) => [e.id, e]));
 const paieById = Object.fromEntries(paie.map((p) => [p.id, p]));
 
-// Détails RH statiques (adresse, contact d'urgence, manager, date d'embauche).
+// Détails RH statiques (état civil, adresse, contact d'urgence, manager, date d'embauche).
 export const employeDetails = {
-  "AUR-1187": { manager: "Direction Pédagogique", embauche: "12/09/2022", adresse: "Quartier Centre, Brazzaville", urgence: { nom: "Gloire Makaya", lien: "Conjoint", tel: "+242 06 222 33 44" } },
-  "AUR-8821": { manager: "Direction Générale", embauche: "14/01/2018", adresse: "14 rue des Lilas, 75011 Paris", urgence: { nom: "Marc Vance", lien: "Conjoint", tel: "+33 6 11 22 33 44" } },
-  "AUR-1102": { manager: "Elena Vance", embauche: "03/09/2020", adresse: "8 av. du Centre, 69003 Lyon", urgence: { nom: "Sofia Rossi", lien: "Sœur", tel: "+33 6 22 33 44 55" } },
-  "AUR-6654": { manager: "Direction Générale", embauche: "22/05/2019", adresse: "3 rue Victor Hugo, 75009 Paris", urgence: { nom: "Paul Dubois", lien: "Conjoint", tel: "+33 6 33 44 55 66" } },
-  "AUR-3398": { manager: "Marcus Thorne", embauche: "11/02/2022", adresse: "27 rue de l'Est, 67000 Strasbourg", urgence: { nom: "Yasmine Benali", lien: "Mère", tel: "+33 6 44 55 66 77" } },
-  "AUR-5567": { manager: "Sarah Jenkins", embauche: "30/06/2017", adresse: "5 quai Nord, 59000 Lille", urgence: { nom: "Claire Girard", lien: "Conjoint", tel: "+33 6 55 66 77 88" } },
-  "AUR-7012": { manager: "Julian Rossi", embauche: "18/11/2021", adresse: "12 rue de l'Atelier, 67000 Strasbourg", urgence: { nom: "Léo Moreau", lien: "Frère", tel: "+33 6 66 77 88 99" } },
-  "AUR-7720": { manager: "Direction Générale", embauche: "07/03/2016", adresse: "9 bd Haussmann, 75008 Paris", urgence: { nom: "Anne Mercier", lien: "Conjoint", tel: "+33 6 77 88 99 00" } },
-  "AUR-9031": { manager: "Julian Rossi", embauche: "25/08/2023", adresse: "44 rue du Sud, 13001 Marseille", urgence: { nom: "Tom Jenkins", lien: "Frère", tel: "+33 6 88 99 00 11" } },
-  "AUR-1190": { manager: "Thomas Girard", embauche: "01/04/2022", adresse: "16 rue du Port, 13002 Marseille", urgence: { nom: "Marie Lefèvre", lien: "Mère", tel: "+33 6 99 00 11 22" } },
-  "AUR-4491": { manager: "David Mercier", embauche: "19/10/2019", adresse: "21 av. du Nord, 59000 Lille", urgence: { nom: "Eva Thorne", lien: "Conjoint", tel: "+33 6 10 20 30 40" } },
-  "AUR-8843": { manager: "Direction Générale", embauche: "13/07/2021", adresse: "6 rue Centrale, 75002 Paris", urgence: { nom: "Sami Cherif", lien: "Frère", tel: "+33 6 20 30 40 50" } },
-  "AUR-2241": { manager: "Julian Rossi", embauche: "09/01/2023", adresse: "33 rue de la Recherche, 69002 Lyon", urgence: { nom: "Hugo Fontaine", lien: "Conjoint", tel: "+33 6 30 40 50 60" } },
+  "AUR-1187": { sexe: "Homme", naissance: "15/03/1990", residence: "Brazzaville", manager: "Direction Pédagogique", embauche: "12/09/2022", adresse: "Quartier Centre, Brazzaville", urgence: { nom: "Gloire Makaya", lien: "Conjoint", tel: "+242 06 222 33 44" } },
+  "AUR-8821": { sexe: "Femme", naissance: "22/07/1985", residence: "Paris", manager: "Direction Générale", embauche: "14/01/2018", adresse: "14 rue des Lilas, 75011 Paris", urgence: { nom: "Marc Vance", lien: "Conjoint", tel: "+33 6 11 22 33 44" } },
+  "AUR-1102": { sexe: "Homme", naissance: "09/11/1991", residence: "Lyon", manager: "Elena Vance", embauche: "03/09/2020", adresse: "8 av. du Centre, 69003 Lyon", urgence: { nom: "Sofia Rossi", lien: "Sœur", tel: "+33 6 22 33 44 55" } },
+  "AUR-6654": { sexe: "Femme", naissance: "03/05/1988", residence: "Paris", manager: "Direction Générale", embauche: "22/05/2019", adresse: "3 rue Victor Hugo, 75009 Paris", urgence: { nom: "Paul Dubois", lien: "Conjoint", tel: "+33 6 33 44 55 66" } },
+  "AUR-3398": { sexe: "Homme", naissance: "27/01/1995", residence: "Strasbourg", manager: "Marcus Thorne", embauche: "11/02/2022", adresse: "27 rue de l'Est, 67000 Strasbourg", urgence: { nom: "Yasmine Benali", lien: "Mère", tel: "+33 6 44 55 66 77" } },
+  "AUR-5567": { sexe: "Homme", naissance: "14/09/1983", residence: "Lille", manager: "Sarah Jenkins", embauche: "30/06/2017", adresse: "5 quai Nord, 59000 Lille", urgence: { nom: "Claire Girard", lien: "Conjoint", tel: "+33 6 55 66 77 88" } },
+  "AUR-7012": { sexe: "Femme", naissance: "30/06/1996", residence: "Strasbourg", manager: "Julian Rossi", embauche: "18/11/2021", adresse: "12 rue de l'Atelier, 67000 Strasbourg", urgence: { nom: "Léo Moreau", lien: "Frère", tel: "+33 6 66 77 88 99" } },
+  "AUR-7720": { sexe: "Homme", naissance: "18/02/1979", residence: "Paris", manager: "Direction Générale", embauche: "07/03/2016", adresse: "9 bd Haussmann, 75008 Paris", urgence: { nom: "Anne Mercier", lien: "Conjoint", tel: "+33 6 77 88 99 00" } },
+  "AUR-9031": { sexe: "Femme", naissance: "12/12/1994", residence: "Marseille", manager: "Julian Rossi", embauche: "25/08/2023", adresse: "44 rue du Sud, 13001 Marseille", urgence: { nom: "Tom Jenkins", lien: "Frère", tel: "+33 6 88 99 00 11" } },
+  "AUR-1190": { sexe: "Homme", naissance: "05/08/1990", residence: "Marseille", manager: "Thomas Girard", embauche: "01/04/2022", adresse: "16 rue du Port, 13002 Marseille", urgence: { nom: "Marie Lefèvre", lien: "Mère", tel: "+33 6 99 00 11 22" } },
+  "AUR-4491": { sexe: "Homme", naissance: "21/04/1982", residence: "Lille", manager: "David Mercier", embauche: "19/10/2019", adresse: "21 av. du Nord, 59000 Lille", urgence: { nom: "Eva Thorne", lien: "Conjoint", tel: "+33 6 10 20 30 40" } },
+  "AUR-8843": { sexe: "Femme", naissance: "08/10/1992", residence: "Paris", manager: "Direction Générale", embauche: "13/07/2021", adresse: "6 rue Centrale, 75002 Paris", urgence: { nom: "Sami Cherif", lien: "Frère", tel: "+33 6 20 30 40 50" } },
+  "AUR-2241": { sexe: "Femme", naissance: "17/03/1997", residence: "Lyon", manager: "Julian Rossi", embauche: "09/01/2023", adresse: "33 rue de la Recherche, 69002 Lyon", urgence: { nom: "Hugo Fontaine", lien: "Conjoint", tel: "+33 6 30 40 50 60" } },
 };
 
 // PRNG déterministe par matricule (historiques stables d'un rendu à l'autre).

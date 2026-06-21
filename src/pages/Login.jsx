@@ -84,7 +84,7 @@ export default function Login() {
       {/* Halo & texture de fond (profondeur discrète autour de la carte) */}
       <div className="absolute -top-32 -left-24 w-[34rem] h-[34rem] rounded-full bg-brand-500/15 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-24 w-[34rem] h-[34rem] rounded-full bg-brand-500/10 blur-3xl pointer-events-none" />
-      <Vagues color="#1a535c" opacity="0.05" />
+      <Vagues color="#1f4a3a" opacity="0.05" />
 
       <div className="reveal relative w-full max-w-5xl grid md:grid-cols-2 rounded-2xl overflow-hidden shadow-pop border border-[var(--border)] bg-surface md:min-h-[580px]">
         {/* ---------- Colonne formulaire ---------- */}
