@@ -7,6 +7,7 @@ const paieById = Object.fromEntries(paie.map((p) => [p.id, p]));
 
 // Détails RH statiques (adresse, contact d'urgence, manager, date d'embauche).
 export const employeDetails = {
+  "AUR-1187": { manager: "Direction Pédagogique", embauche: "12/09/2022", adresse: "Quartier Centre, Brazzaville", urgence: { nom: "Gloire Makaya", lien: "Conjoint", tel: "+242 06 222 33 44" } },
   "AUR-8821": { manager: "Direction Générale", embauche: "14/01/2018", adresse: "14 rue des Lilas, 75011 Paris", urgence: { nom: "Marc Vance", lien: "Conjoint", tel: "+33 6 11 22 33 44" } },
   "AUR-1102": { manager: "Elena Vance", embauche: "03/09/2020", adresse: "8 av. du Centre, 69003 Lyon", urgence: { nom: "Sofia Rossi", lien: "Sœur", tel: "+33 6 22 33 44 55" } },
   "AUR-6654": { manager: "Direction Générale", embauche: "22/05/2019", adresse: "3 rue Victor Hugo, 75009 Paris", urgence: { nom: "Paul Dubois", lien: "Conjoint", tel: "+33 6 33 44 55 66" } },
@@ -66,29 +67,32 @@ export function historiqueActivite(id) {
   ];
 }
 
-// Historique des paiements — 6 derniers mois.
+// Conversion des montants (données € de base) vers des FCFA réalistes.
+const FCFA = 150;
+
+// Historique des paiements — 6 derniers mois (FCFA).
 export function historiquePaiements(id) {
   const p = paieById[id];
   const base = p?.base ?? 3000;
   const primes = p?.primes ?? 200;
   const retenues = p?.retenues ?? 240;
   const avances = p?.avances ?? 0;
-  const net = base + primes - retenues - avances;
-  const mois = ["Mai 2025", "Avril 2025", "Mars 2025", "Février 2025", "Janvier 2025", "Décembre 2024"];
+  const net = (base + primes - retenues - avances) * FCFA;
+  const mois = ["Mai 2026", "Avril 2026", "Mars 2026", "Février 2026", "Janvier 2026", "Décembre 2025"];
   return mois.map((m, i) => ({
     mois: m,
-    net: net + (i === 0 ? 0 : ((i * 13) % 60) - 20),
+    net: net + (i === 0 ? 0 : (((i * 13) % 60) - 20) * FCFA),
     status: i === 0 && p?.status === "En attente" ? "En attente" : "Payé",
   }));
 }
 
-// Fiche de paie détaillée (mois courant).
+// Fiche de paie détaillée du mois courant (FCFA).
 export function paieDetail(id) {
   const p = paieById[id];
-  const base = p?.base ?? 3000;
-  const primes = p?.primes ?? 200;
-  const retenues = p?.retenues ?? 240;
-  const avances = p?.avances ?? 0;
+  const base = (p?.base ?? 3000) * FCFA;
+  const primes = (p?.primes ?? 200) * FCFA;
+  const retenues = (p?.retenues ?? 240) * FCFA;
+  const avances = (p?.avances ?? 0) * FCFA;
   return { base, primes, avances, retenues, net: base + primes - retenues - avances, status: p?.status ?? "Payé" };
 }
 
@@ -101,6 +105,70 @@ export function documentsEmploye(id) {
     { nom: "Fiche de paie — Mai 2025", type: "Paie", date: "31/05/2025", icon: "receipt_long", size: "180 Ko" },
     { nom: "Avenant — Télétravail", type: "RH", date: "10/03/2024", icon: "edit_document", size: "95 Ko" },
   ];
+}
+
+// Calendrier mensuel — Juin 2026 (modèle hebdomadaire de créneaux, conforme à la maquette).
+// Juin 2026 démarre un lundi · 30 jours · aujourd'hui = 21.
+// Modèle : 2 créneaux les LUN/MAR/MER · férié le 10 · événement le 11.
+const MOIS_LABEL = "Juin 2026";
+const NB_JOURS = 30;
+const TODAY = 21;
+const COURS_DOW = [0, 1, 2]; // lundi, mardi, mercredi
+const CRENEAUX_JOUR = 2; // 2 créneaux par jour travaillé
+const TAUX_HORAIRE = 1300; // FCFA / h
+const FERIES = { 10: "Journée Nationale de Réconciliation" };
+const EVENTS = { 11: "Réunion pédagogique" };
+
+export function calendrierPresence(id = "") {
+  const r = makeRng(id + "presence-juin");
+  const jours = [];
+  let joursCours = 0;
+  let coursEcoules = 0;
+  let joursPointes = 0;
+  for (let d = 1; d <= NB_JOURS; d++) {
+    const dow = (d - 1) % 7; // 0 = lundi … 6 = dimanche (1er juin = lundi)
+    const weekend = dow >= 5;
+    const ferie = FERIES[d] ?? null;
+    const event = EVENTS[d] ?? null;
+    const cours = COURS_DOW.includes(dow) && !ferie; // jour travaillé (attendu)
+    const futur = d > TODAY;
+    let etat = null; // "Présent" | "Retard" | "Absent" | "Prévu"
+    let arrivee = null;
+    let retardMin = 0;
+    if (cours) {
+      joursCours++;
+      if (futur) {
+        etat = "Prévu"; // à pointer (jour à venir)
+      } else {
+        coursEcoules++;
+        const v = r();
+        if (v < 0.1) {
+          etat = "Absent";
+        } else {
+          retardMin = r() < 0.22 ? Math.floor(r() * 16) + 1 : 0;
+          etat = retardMin > 5 ? "Retard" : "Présent";
+          arrivee = `08:${String(retardMin).padStart(2, "0")}`;
+          joursPointes++;
+        }
+      }
+    }
+    jours.push({ jour: d, dow, weekend, ferie, event, cours, futur, today: d === TODAY, etat, arrivee, retardMin });
+  }
+  const heuresTravaillees = joursPointes * CRENEAUX_JOUR;
+  const heuresPlanifiees = joursCours * CRENEAUX_JOUR;
+  return {
+    mois: MOIS_LABEL,
+    today: TODAY,
+    jours,
+    joursCours,
+    coursEcoules,
+    joursPointes,
+    heuresPlanifiees,
+    heuresTravaillees,
+    tauxPresence: coursEcoules ? Math.round((joursPointes / coursEcoules) * 100) : 0,
+    tauxHoraire: TAUX_HORAIRE,
+    remunerationEstimee: heuresTravaillees * TAUX_HORAIRE,
+  };
 }
 
 // Productivité de l'agent (score, classement, tendance, série 7 jours).

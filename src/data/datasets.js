@@ -3,6 +3,7 @@
 // SOURCE UNIQUE : chaque employé porte son pointage du jour (`today`).
 // Tous les chiffres de l'app (dashboard, présence, agences) en sont dérivés.
 export const employes = [
+  { id: "AUR-1187", name: "Prince Makaya", fonction: "Professeur d'anglais", matiere: "Anglais", tauxHoraire: 1300, department: "Langues", agence: "Siège Social", phone: "+242 06 123 45 67", email: "p.makaya@madmen.io", status: "Actif", today: { prevu: "08:00", arrivee: "--:--", retardMin: null, retenue: 0, statut: "Présent", poste: "Salle A1", justification: null } },
   { id: "AUR-8821", name: "Elena Vance", fonction: "Responsable Cybersécurité", department: "Cybersécurité", agence: "Siège Social", phone: "+33 6 12 45 78 90", email: "e.vance@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:14", retardMin: 0, retenue: 0, statut: "Présent", poste: "WS-042-ALPHA", justification: null } },
   { id: "AUR-4491", name: "Marcus Thorne", fonction: "Ingénieur Infrastructure", department: "Infrastructure", agence: "Agence Nord", phone: "+33 6 88 21 09 14", email: "m.thorne@madmen.io", status: "Congé", today: { prevu: "08:30", arrivee: "--:--", retardMin: null, retenue: 0, statut: "Congé", poste: "Distant", justification: { statut: "Justifié", motif: "Congé approuvé", via: "RH" } } },
   { id: "AUR-1102", name: "Julian Rossi", fonction: "Chercheur IA", department: "Recherche IA", agence: "Agence Centre", phone: "+33 6 47 55 33 21", email: "j.rossi@madmen.io", status: "Actif", today: { prevu: "08:30", arrivee: "08:47", retardMin: 17, retenue: 34, statut: "Retard", poste: "WS-119-BETA", justification: null } },
@@ -123,6 +124,7 @@ export const demandeParEmploye = Object.fromEntries(demandes.map((d) => [d.emplo
 // VUE CENTRÉE AGENTS — statut temps réel + dernière activité (lié par matricule)
 // ---------------------------------------------------------------------------
 export const tempsReel = {
+  "AUR-1187": { live: "En activité", detail: "Cours d'anglais · Salle A1", depuis: "à l'instant" },
   "AUR-8821": { live: "En activité", detail: "Connectée · poste WS-042-ALPHA", depuis: "à l'instant" },
   "AUR-4491": { live: "Congé", detail: "Congé approuvé jusqu'au 24 juin", depuis: "—" },
   "AUR-1102": { live: "En activité", detail: "Session active · poste WS-119-BETA", depuis: "il y a 2 min" },
@@ -140,6 +142,9 @@ export const tempsReel = {
 // Statut live → tonalité de badge (vert / ambre / rouge / bleu)
 export const toneLive = { "En activité": "emerald", "En pause": "amber", "Absent": "rose", "Congé": "sky" };
 export const ordreLive = { "En activité": 0, "En pause": 1, "Absent": 2, "Congé": 3 };
+
+// Devise officielle de l'app : FCFA. Format « 1 300 FCFA ».
+export const fcfa = (n) => Math.round(n).toLocaleString("fr-FR") + " FCFA";
 
 // Flux d'activité récente (panneau droit du dashboard).
 export const activiteRecente = [

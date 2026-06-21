@@ -6,6 +6,7 @@ import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Employes from "./pages/Employes.jsx";
 import ProfilEmploye from "./pages/ProfilEmploye.jsx";
+import ProfilDetails from "./pages/ProfilDetails.jsx";
 import Enrolement from "./pages/Enrolement.jsx";
 import Presence from "./pages/Presence.jsx";
 import Activite from "./pages/Activite.jsx";
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="alertes" element={<Alertes />} />
             <Route path="employes" element={<Employes />} />
             <Route path="employes/:id" element={<ProfilEmploye />} />
+            <Route path="employes/:id/details" element={<ProfilDetails />} />
             <Route path="enrolement" element={<Enrolement />} />
             <Route path="presence" element={<Presence />} />
             <Route path="activite" element={<Activite />} />

@@ -1,58 +1,66 @@
 /** @type {import('tailwindcss').Config} */
-// MADMEN — "Crème & Canard" : identité officielle de la marque.
-// Fond crème, accent bleu canard (#1A535C), taupe secondaire (#D2BE9B), texte anthracite (#1E1E1E).
+// MADMEN — thème « Vert sapin & Crème ». Sidebar vert sapin, fond crème, accent OR.
 export default {
   darkMode: "class",
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        // Accent de marque — BLEU CANARD officiel. brand-600 = #1A535C (CTA, nav active, liens, focus).
+        // Accent de marque — VERT SAPIN. brand-600 = #1f4a3a (bandeau, CTA, liens, focus).
         brand: {
-          50: "#e9f1f2",
-          100: "#cfe0e2",
-          200: "#a6c6ca",
-          300: "#73a4ab",
-          400: "#458088",
-          500: "#266b75",
-          600: "#1a535c", // bleu canard signature
-          700: "#143f47", // hover / pressé
-          800: "#0f3036",
-          900: "#0a2226",
+          50: "#eef3f1",
+          100: "#d3e0db",
+          200: "#a7c2b8",
+          300: "#6f9c8d",
+          400: "#3f7363",
+          500: "#2a5a48",
+          600: "#1f4a3a", // haut du dégradé bandeau
+          700: "#173228", // bas du dégradé / hover foncé
+          800: "#102620",
+          900: "#0b1a16",
+        },
+        // Sidebar dédiée (distincte du bandeau)
+        sidebar: "#1c3a30",
+        "sidebar-hover": "#274b40",
+        // OR / doré signature — couleur d'ACTION (CTA, KPI, menu actif).
+        or: {
+          50: "#faf3e3",
+          100: "#f1e0bb",
+          200: "#e6c98a",
+          300: "#d9af57",
+          400: "#cb9b3c",
+          500: "#b8882a", // OR signature
+          600: "#9c7122",
+          700: "#7d591c",
+          800: "#634718",
+          900: "#523b16",
         },
         // Surfaces & fond
-        canvas: "#f7f4e9", // crème (fond général)
-        surface: "#ffffff", // cartes / panneaux
-        "surface-2": "#f0ead9", // surfaces surélevées / hover / en-têtes doux
-        // OR / doré signature — couleur d'ACTION dominante (CTA, KPI, menu actif, actions importantes).
-        or: {
-          50: "#fbf6e9",
-          100: "#f5e9c6",
-          200: "#ecd596",
-          300: "#e2bd5e",
-          400: "#d6a534",
-          500: "#c8941f", // doré signature
-          600: "#a8791a",
-          700: "#855e18",
-          800: "#6b4c19",
-          900: "#5a4019",
-        },
-        // Taupe officiel (accents chauds : en-têtes de tableau, blocs secondaires, badges)
-        sand: "#d2be9b",
-        "sand-soft": "#e7dcc4",
-        // Bordures (mappées sur variables CSS)
+        canvas: "#f4f0e7", // crème
+        surface: "#ffffff",
+        "surface-2": "#faf7f0",
+        sand: "#d8cdb6",
+        "sand-soft": "#ece4d3",
+        // Bordures (variables CSS)
         border: "var(--border)",
         "border-strong": "var(--border-strong)",
-        // Échelle d'encre / texte (anthracite chaud)
-        ink: "#1e1e1e", // titres / texte fort
-        texte: "#33312c", // texte courant
-        muted: "#6e685c", // secondaire
-        subtle: "#938b7a", // labels / placeholders
-        faint: "#b9af9a", // discret / séparateurs
+        hairline: "var(--hairline)",
+        // Encre / texte
+        ink: "#1f2a25",
+        texte: "#2c3a33",
+        muted: "#5d6b63",
+        subtle: "#97a096",
+        faint: "#b9c1b8",
+        // Statuts (alignés sur le brief — deep-merge avec les palettes Tailwind)
+        emerald: { 50: "#e7f5ee", 400: "#3bb079", 500: "#1f9d63", 600: "#1a854f", 700: "#176b42" },
+        rose: { 50: "#fbeae5", 400: "#e07a66", 500: "#d9614b", 600: "#c14e3a", 700: "#9e3e2e" },
+        sky: { 50: "#e9f0fa", 400: "#5b92d2", 500: "#3f7cc4", 600: "#356bab", 700: "#2b568a" },
+        amber: { 50: "#fdf1e3", 400: "#e69633", 500: "#d97f1e", 600: "#b5651a", 700: "#8c4e16" },
       },
       fontFamily: {
-        sans: ["Geist", "system-ui", "-apple-system", "sans-serif"],
-        mono: ["Geist Mono", "ui-monospace", "monospace"],
+        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        display: ["Bricolage Grotesque", "Inter", "system-ui", "sans-serif"],
+        mono: ["Inter", "ui-monospace", "monospace"],
       },
       letterSpacing: {
         kicker: "0.12em",
@@ -66,12 +74,12 @@ export default {
         content: "1440px",
       },
       boxShadow: {
-        soft: "0 1px 2px rgba(30,30,30,0.04), 0 1px 3px rgba(30,30,30,0.06)",
-        card: "0 1px 2px rgba(30,30,30,0.04), 0 4px 16px -6px rgba(30,30,30,0.08)",
-        lift: "0 12px 28px -10px rgba(26,83,92,0.20), 0 2px 8px rgba(30,30,30,0.06)",
-        pop: "0 20px 50px -16px rgba(30,30,30,0.22)",
-        focus: "0 0 0 3px rgba(26,83,92,0.22)",
-        glow: "0 0 0 1px rgba(26,83,92,0.18), 0 10px 30px -8px rgba(26,83,92,0.22)",
+        soft: "0 1px 2px rgba(31,42,37,0.04), 0 1px 3px rgba(31,42,37,0.06)",
+        card: "0 1px 2px rgba(31,42,37,0.04), 0 4px 16px -6px rgba(31,42,37,0.08)",
+        lift: "0 12px 28px -10px rgba(31,74,58,0.20), 0 2px 8px rgba(31,42,37,0.06)",
+        pop: "0 20px 50px -16px rgba(31,42,37,0.22)",
+        focus: "0 0 0 3px rgba(31,74,58,0.22)",
+        glow: "0 0 0 1px rgba(31,74,58,0.18), 0 10px 30px -8px rgba(31,74,58,0.22)",
       },
     },
   },

@@ -5,10 +5,8 @@ import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import CartePaie from "../components/ui/CartePaie.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes } from "../data/datasets.js";
+import { employes, fcfa } from "../data/datasets.js";
 import { paieDetail } from "../data/profil.js";
-
-const euro = (n) => n.toLocaleString("fr-FR") + " €";
 
 // Statut de paiement par agent (le reste = « Payé »).
 const STATUT = { "AUR-7720": "En attente", "AUR-5567": "En attente", "AUR-2241": "En attente", "AUR-1190": "En retard" };
@@ -46,17 +44,17 @@ export default function Finance() {
   const payer = (e, f) =>
     confirm({
       title: "Valider ce paiement ?",
-      message: `Le paiement de ${e.name} (${euro(f.net)}) sera marqué comme payé et envoyé en comptabilité.`,
+      message: `Le paiement de ${e.name} (${fcfa(f.net)}) sera marqué comme payé et envoyé en comptabilité.`,
       confirmLabel: "Valider le paiement",
       onConfirm: () => toast(`Paiement de ${e.name} validé`, "success"),
     });
   const bulletin = (e) => toast(`Bulletin de paie de ${e.name} généré (PDF)`, "info");
 
   const kpis = [
-    { label: "Masse salariale", value: euro(masseSalariale), icon: "account_balance_wallet", tone: "or" },
-    { label: "À payer", value: euro(aPayer), icon: "schedule", tone: "amber" },
-    { label: "Avances", value: euro(totalAvances), icon: "trending_down", tone: "sky" },
-    { label: "Retenues", value: euro(totalRetenues), icon: "remove_circle", tone: "rose" },
+    { label: "Masse salariale", value: fcfa(masseSalariale), icon: "account_balance_wallet", tone: "or" },
+    { label: "À payer", value: fcfa(aPayer), icon: "schedule", tone: "amber" },
+    { label: "Avances", value: fcfa(totalAvances), icon: "trending_down", tone: "sky" },
+    { label: "Retenues", value: fcfa(totalRetenues), icon: "remove_circle", tone: "rose" },
   ];
   const tonesKpi = {
     or: "bg-or-100 text-or-700",

@@ -88,7 +88,7 @@ export default function SideNav({ open, onClose }) {
       )}
 
       <aside
-        className={`fixed lg:static top-0 left-0 z-50 lg:z-30 flex flex-col h-full w-72 py-6 px-4 bg-brand-600 border-r border-brand-700 overflow-y-auto scroll-thin transform transition-transform duration-300 ease-out ${
+        className={`fixed lg:static top-0 left-0 z-50 lg:z-30 flex flex-col h-full w-72 py-6 px-4 bg-sidebar border-r border-black/20 overflow-y-auto scroll-thin transform transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >

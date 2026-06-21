@@ -2,8 +2,8 @@ import { useNavigate } from "react-router-dom";
 import Avatar from "./Avatar.jsx";
 import Icon from "./Icon.jsx";
 import StatusPill from "./StatusPill.jsx";
+import { fcfa } from "../../data/datasets.js";
 
-const euro = (n) => n.toLocaleString("fr-FR") + " €";
 const tonePaie = { Payé: "emerald", "En attente": "amber", "En retard": "rose" };
 const barPaie = { Payé: "border-t-emerald-500", "En attente": "border-t-amber-500", "En retard": "border-t-rose-500" };
 
@@ -35,13 +35,13 @@ export default function CartePaie({ e, f, statut, onPayer, onBulletin }) {
 
       {/* Détail des montants */}
       <div className="px-5 pb-4 space-y-2 border-t border-border pt-4">
-        <Ligne label="Salaire de base" value={euro(f.base)} />
-        <Ligne label="Primes" value={euro(f.primes)} tone="text-emerald-600" signe="+ " />
-        <Ligne label="Avances" value={euro(f.avances)} tone="text-amber-600" signe="− " />
-        <Ligne label="Retenues" value={euro(f.retenues)} tone="text-rose-600" signe="− " />
+        <Ligne label="Salaire de base" value={fcfa(f.base)} />
+        <Ligne label="Primes" value={fcfa(f.primes)} tone="text-emerald-600" signe="+ " />
+        <Ligne label="Avances" value={fcfa(f.avances)} tone="text-amber-600" signe="− " />
+        <Ligne label="Retenues" value={fcfa(f.retenues)} tone="text-rose-600" signe="− " />
         <div className="flex items-center justify-between pt-3 mt-1 border-t border-border">
           <span className="text-sm font-semibold text-texte">À payer</span>
-          <span className="text-xl font-semibold font-mono tabular-nums text-or-700">{euro(f.net)}</span>
+          <span className="text-xl font-semibold font-mono tabular-nums text-or-700">{fcfa(f.net)}</span>
         </div>
       </div>
 

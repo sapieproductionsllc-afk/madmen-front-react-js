@@ -11,36 +11,37 @@
   color-scheme: light;
 
   /* Surfaces & fond (crème → blanc) */
-  --canvas: #f7f4e9;
+  --canvas: #f4f0e7;
   --surface: #ffffff;
-  --surface-2: #f0ead9;
+  --surface-2: #faf7f0;
 
-  /* Bordures (beige chaud sur fond clair) */
-  --border: #e6ddc8;
-  --border-strong: #d8ccb0;
+  /* Bordures */
+  --border: #e7e1d4;
+  --border-strong: #d9d0bd;
+  --hairline: #efe9dd;
 
-  /* Texte (anthracite chaud, hiérarchie nette) */
-  --ink: #1e1e1e;
-  --texte: #33312c;
-  --muted: #6e685c;
-  --subtle: #938b7a;
-  --faint: #b9af9a;
+  /* Texte */
+  --ink: #1f2a25;
+  --texte: #2c3a33;
+  --muted: #5d6b63;
+  --subtle: #97a096;
+  --faint: #b9c1b8;
 
-  /* Marque (BLEU CANARD signature) */
-  --brand-50: #e9f1f2;
-  --brand-100: #cfe0e2;
-  --brand-500: #266b75;
-  --brand-600: #1a535c;
-  --brand-700: #143f47;
+  /* Marque (VERT SAPIN signature) */
+  --brand-50: #eef3f1;
+  --brand-100: #d3e0db;
+  --brand-500: #2a5a48;
+  --brand-600: #1f4a3a;
+  --brand-700: #173228;
 
-  /* Ombres douces en couches (teinte chaude/canard pour le relief) */
-  --shadow-soft: 0 1px 2px rgba(30, 30, 30, 0.04), 0 1px 3px rgba(30, 30, 30, 0.06);
-  --shadow-card: 0 1px 2px rgba(30, 30, 30, 0.04), 0 4px 16px -6px rgba(30, 30, 30, 0.08);
-  --shadow-lift: 0 12px 28px -10px rgba(26, 83, 92, 0.20), 0 2px 8px rgba(30, 30, 30, 0.06);
-  --shadow-pop: 0 20px 50px -16px rgba(30, 30, 30, 0.22);
+  /* Ombres douces en couches (teinte verte pour le relief) */
+  --shadow-soft: 0 1px 2px rgba(31, 42, 37, 0.04), 0 1px 3px rgba(31, 42, 37, 0.06);
+  --shadow-card: 0 1px 2px rgba(31, 42, 37, 0.04), 0 4px 16px -6px rgba(31, 42, 37, 0.08);
+  --shadow-lift: 0 12px 28px -10px rgba(31, 74, 58, 0.20), 0 2px 8px rgba(31, 42, 37, 0.06);
+  --shadow-pop: 0 20px 50px -16px rgba(31, 42, 37, 0.22);
 
-  /* Focus ring (halo canard) */
-  --focus-ring: 0 0 0 3px rgba(26, 83, 92, 0.22);
+  /* Focus ring (halo vert sapin) */
+  --focus-ring: 0 0 0 3px rgba(31, 74, 58, 0.22);
 
   /* Easing standard du design system */
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -54,11 +55,19 @@ body {
 body {
   background-color: var(--canvas);
   color: var(--texte);
-  font-family: "Geist", system-ui, sans-serif;
-  font-feature-settings: "cv01", "ss01";
+  font-family: "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+/* Titres en Bricolage Grotesque (police d'affichage) */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
+  }
 }
 
 /* Chiffres alignés par défaut sur le mono */
@@ -126,18 +135,18 @@ body {
   background: transparent;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: #d8ccb0;
+  background: #d9d0bd;
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 .scroll-thin::-webkit-scrollbar-thumb:hover {
-  background: #c4b594;
+  background: #c4b9a0;
   background-clip: padding-box;
 }
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: #d8ccb0 transparent;
+  scrollbar-color: #d9d0bd transparent;
 }
 
 /* Point "live" qui pulse */

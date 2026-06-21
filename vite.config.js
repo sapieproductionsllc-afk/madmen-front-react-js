@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port: 5173,
+    port: 5210, // port dédié MADMEN (5173/5180 utilisés par d'autres projets)
+    strictPort: true,
   },
 });
