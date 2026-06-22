@@ -1,10 +1,73 @@
+import { useEffect, useState } from "react";
 import Avatar from "./Avatar.jsx";
 import Icon from "./Icon.jsx";
 import ActionsRapides from "./ActionsRapides.jsx";
-import { historiquePresence, productiviteEmploye } from "../../data/profil.js";
+import { apiGet } from "../../lib/api.js";
 
 const barColor = (p) => (p >= 90 ? "bg-emerald-500" : p >= 80 ? "bg-sky-500" : p >= 70 ? "bg-amber-500" : "bg-rose-500");
 const txtColor = (p) => (p >= 90 ? "text-emerald-600" : p >= 80 ? "text-sky-600" : p >= 70 ? "text-amber-600" : "text-rose-600");
+
+// API statut pointage (present/retard/absent/conge) -> libellé attendu par le JSX.
+const STATUT_PRESENCE = { present: "Présent", retard: "Retard", absent: "Absent", conge: "Congé" };
+
+// "AAAA-MM-JJ HH:MM:SS" | "HH:MM:SS" -> "HH:MM" (ou "—").
+function hhmm(v) {
+  if (!v) return "—";
+  const m = String(v).match(/(\d{2}):(\d{2})/);
+  return m ? `${m[1]}:${m[2]}` : "—";
+}
+
+// "AAAA-MM-JJ" -> "20 juin" (libellé court FR).
+const MOIS_COURT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+function dateCourte(v) {
+  if (!v) return "—";
+  const [, mn, j] = String(v).slice(0, 10).split("-");
+  if (!mn || !j) return String(v);
+  return `${Number(j)} ${MOIS_COURT[Number(mn) - 1] ?? ""}`.trim();
+}
+
+// Durée travaillée (minutes) -> "8h 12m" (ou "—").
+function dureeTexte(min) {
+  const m = Math.round(Number(min) || 0);
+  if (m <= 0) return "—";
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
+// Minutes -> "Xh YYm" (productivité : temps moyen / inactivité).
+function hhmmDuree(min) {
+  const m = Math.round(Number(min) || 0);
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
+// GET /api/pointages?employe_id={id} -> 7 derniers jours [{date,statut,arrivee,depart,retardMin,temps}].
+function mapPresence(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .slice(0, 7) // déjà trié ORDER BY id DESC (plus récents d'abord)
+    .map((p) => ({
+      date: dateCourte(p.date),
+      statut: STATUT_PRESENCE[p.statut] ?? "Absent",
+      arrivee: hhmm(p.heure_entree),
+      depart: hhmm(p.heure_sortie),
+      retardMin: Number(p.retard_minutes) || 0,
+      temps: dureeTexte(p.temps_present_minutes),
+    }));
+}
+
+// GET /api/productivite/{id} -> { score, rang, total, tendance, tempsMoyen, inactivite, serie }.
+function mapProductivite(data) {
+  const resume = data?.resume ?? {};
+  const serie = (Array.isArray(data?.serie) ? data.serie : []).map((d) => Math.round(Number(d.taux_productivite) || 0));
+  const jours = Number(resume.jours_travailles) || 0;
+  return {
+    score: Math.round(Number(resume.taux_moyen) || 0),
+    rang: 0, // TODO: endpoint /api/productivite/{id} ne renvoie pas le rang individuel
+    total: 0, // TODO: idem, taille du classement non fournie par /api/productivite/{id}
+    tendance: 0, // TODO: tendance non fournie par /api/productivite/{id}
+    tempsMoyen: jours ? hhmmDuree((Number(resume.heures_travaillees) || 0) * 60 / jours) : "—",
+    inactivite: jours ? hhmmDuree((Number(resume.heures_inactivite) || 0) * 60 / jours) : "—",
+    serie,
+  };
+}
 
 function Barre({ label, pct }) {
   return (
@@ -22,11 +85,38 @@ function Barre({ label, pct }) {
 
 // Carte « performance » (page Rapports) — indicateurs agrégés par agent.
 export default function CartePerformance({ e }) {
-  const presence = historiquePresence(e.id);
-  const prod = productiviteEmploye(e.id);
+  // id numérique API (mapEmploye expose _id) ; repli sur e.id si besoin.
+  const apiId = e?._id ?? e?.id;
+
+  // États vides neutres : aucune donnée fictive tant que l'API n'a pas répondu.
+  const [presence, setPresence] = useState([]);
+  const [prod, setProd] = useState({ score: 0, rang: 0, total: 0, tendance: 0, tempsMoyen: "—", inactivite: "—", serie: [] });
+
+  useEffect(() => {
+    let actif = true;
+    if (apiId == null) return undefined;
+
+    Promise.all([
+      apiGet(`/api/pointages?employe_id=${apiId}`).catch(() => []),
+      apiGet(`/api/productivite/${apiId}`).catch(() => null),
+    ])
+      .then(([pointages, prodData]) => {
+        if (!actif) return;
+        setPresence(mapPresence(pointages));
+        if (prodData) setProd(mapProductivite(prodData));
+      })
+      .catch(() => {
+        /* états vides neutres déjà en place */
+      });
+
+    return () => {
+      actif = false;
+    };
+  }, [apiId]);
+
   const jours = presence.length || 1;
   const presents = presence.filter((p) => p.statut === "Présent" || p.statut === "Retard").length;
-  const presencePct = Math.round((presents / jours) * 100);
+  const presencePct = presence.length ? Math.round((presents / jours) * 100) : 0;
   const retards = presence.filter((p) => p.statut === "Retard").length;
   const absences = presence.filter((p) => p.statut === "Absent").length;
 

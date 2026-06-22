@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import { employes } from "../data/datasets.js";
+import { apiGet, apiPost } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Button from "../components/ui/Button.jsx";
 import { Input } from "../components/ui/Input.jsx";
@@ -9,100 +10,218 @@ import SearchInput from "../components/ui/SearchInput.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 
 const photoDe = (id) => `https://i.pravatar.cc/120?u=${encodeURIComponent(id)}`;
-const collegues = employes.slice(0, 8);
-// Diffusion à tout le personnel en tête de liste.
-const TOUS = { id: "ALL", name: "Tout le personnel", fonction: `${employes.length} membres`, broadcast: true };
-const convs = [TOUS, ...collegues];
 
-const filsSeed = {
-  ALL: [
-    { de: "moi", texte: "Bonjour à toutes et à tous — réunion générale vendredi à 10h en salle B2.", heure: "08:00" },
-    { de: "moi", type: "document", nom: "Note_de_service_juin.pdf", taille: "182 Ko", heure: "08:01" },
-  ],
-  "AUR-1187": [
-    { de: "lui", texte: "Bonjour ! Les copies du test d'anglais sont prêtes.", heure: "08:42" },
-    { de: "moi", texte: "Parfait, merci. Tu peux les déposer au bureau RH ?", heure: "08:45" },
-    { de: "lui", texte: "Oui, je passe avant midi.", heure: "08:46" },
-  ],
-  "AUR-8821": [
-    { de: "moi", texte: "Elena, le rapport de sécurité est validé ?", heure: "09:10" },
-    { de: "lui", texte: "Oui, je l'envoie d'ici une heure.", heure: "09:12" },
-    { de: "moi", texte: "Je bloque un créneau mardi matin.", heure: "09:15" },
-  ],
-  "AUR-4491": [
-    { de: "lui", texte: "Je suis en congé aujourd'hui, je réponds à mon retour.", heure: "07:30" },
-    { de: "moi", texte: "Pas de souci, bon repos !", heure: "07:35" },
-  ],
-  "AUR-1102": [
-    { de: "lui", texte: "Le modèle a fini d'entraîner cette nuit.", heure: "08:05" },
-    { de: "moi", texte: "Excellent, quels résultats ?", heure: "08:20" },
-    { de: "lui", texte: "Précision en hausse de 4 points.", heure: "08:22" },
-  ],
-  "AUR-9031": [
-    { de: "moi", texte: "Sarah, tout va bien de ton côté ?", heure: "10:00" },
-    { de: "lui", texte: "Je suis souffrante aujourd'hui, désolée.", heure: "10:12" },
-  ],
-  "AUR-7720": [
-    { de: "lui", texte: "Les fiches de paie sont prêtes à valider.", heure: "11:02" },
-    { de: "moi", texte: "Je regarde ça cet après-midi.", heure: "11:10" },
-  ],
-  "AUR-6654": [
-    { de: "moi", texte: "Amélie, peux-tu programmer les entretiens annuels ?", heure: "14:20" },
-    { de: "lui", texte: "Oui, je lance les invitations aujourd'hui.", heure: "14:25" },
-  ],
-  "AUR-3398": [
-    { de: "lui", texte: "Le poste WS-205 est de nouveau opérationnel.", heure: "09:40" },
-    { de: "moi", texte: "Merci Karim, rapide comme toujours !", heure: "09:42" },
-  ],
+// Heure courte (HH:MM) à partir d'un horodatage API (created_at) ou maintenant.
+const heureDe = (ts) => {
+  const d = ts ? new Date(typeof ts === "string" ? ts.replace(" ", "T") : ts) : new Date();
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+};
+
+// Message API -> forme attendue par le JSX (de/texte/heure, ou document).
+const mapMessage = (m) => {
+  const base = { de: m.mien ? "moi" : "lui", heure: heureDe(m.created_at) };
+  if (m.type !== "texte" && m.fichier) {
+    const ko = m.fichier.taille != null ? Math.max(1, Math.round(m.fichier.taille / 1024)) : null;
+    return { ...base, type: "document", nom: m.fichier.nom_original || "Document", taille: ko != null ? `${ko} Ko` : "—" };
+  }
+  return { ...base, texte: m.contenu ?? "" };
 };
 
 export default function Messagerie({ embedded = false }) {
   const { toast } = useUI();
   const [recherche, setRecherche] = useState("");
   const [selectedId, setSelectedId] = useState("ALL");
-  const [fils, setFils] = useState(filsSeed);
+  // Fils de messages chargés à la demande, indexés par id de sélection (matricule ou "ALL").
+  const [fils, setFils] = useState({});
   const [texte, setTexte] = useState("");
   const finFilRef = useRef(null);
   const fileRef = useRef(null);
 
-  const conv = useMemo(() => convs.find((e) => e.id === selectedId) ?? null, [selectedId]);
+  // Annuaire des employés (collègues) + conversations RÉELLES depuis l'API.
+  const [employes, setEmployes] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [chargementFil, setChargementFil] = useState(false);
+
+  useEffect(() => {
+    setChargement(true);
+    setErreur(null);
+    Promise.all([apiGet("/api/employes"), apiGet("/api/conversations")])
+      .then(([liste, convs]) => {
+        setEmployes((liste ?? []).map(mapEmploye));
+        setConversations(Array.isArray(convs) ? convs : []);
+      })
+      .catch((e) => {
+        const msg = e?.message || "Erreur de chargement";
+        setErreur(msg);
+        toast(msg, "error");
+      })
+      .finally(() => setChargement(false));
+  }, [toast]);
+
+  // Trouve la conversation directe existante avec un employé (par son id numérique).
+  const convDirecteDe = (employeId) =>
+    conversations.find((c) => c.type === "direct" && c.autre_membre?.employe_id === employeId) || null;
+
+  // Liste des conversations : « Tout le personnel » (diffusion) en tête + collègues.
+  const convs = useMemo(() => {
+    const collegues = employes.slice(0, 8);
+    const TOUS = { id: "ALL", name: "Tout le personnel", fonction: `${employes.length} membres`, broadcast: true };
+    return [TOUS, ...collegues];
+  }, [employes]);
+
+  const conv = useMemo(() => convs.find((e) => e.id === selectedId) ?? null, [convs, selectedId]);
   const liste = useMemo(() => {
     const q = recherche.trim().toLowerCase();
     return q ? convs.filter((e) => e.name.toLowerCase().includes(q)) : convs;
-  }, [recherche]);
+  }, [convs, recherche]);
   const messages = (selectedId && fils[selectedId]) || [];
+
+  // À la sélection d'un collègue : charge la conversation directe existante, sinon la crée.
+  useEffect(() => {
+    if (!selectedId || selectedId === "ALL") return;
+    if (fils[selectedId]) return; // déjà chargé
+
+    const emp = employes.find((e) => e.id === selectedId);
+    if (!emp?._id) return;
+
+    let actif = true;
+    setChargementFil(true);
+
+    const chargerMessages = async (convId) => {
+      const msgs = await apiGet(`/api/conversations/${convId}/messages`);
+      if (!actif) return;
+      setFils((prev) => ({ ...prev, [selectedId]: (Array.isArray(msgs) ? msgs : []).map(mapMessage) }));
+    };
+
+    (async () => {
+      try {
+        let c = convDirecteDe(emp._id);
+        if (!c) {
+          // Pas de fil direct existant -> on le crée (idempotent côté API).
+          c = await apiPost("/api/conversations", { type: "direct", membres: [emp._id] });
+          if (!actif) return;
+          if (c && !conversations.some((x) => x.id === c.id)) {
+            setConversations((prev) => [c, ...prev]);
+          }
+        }
+        if (c?.id != null) await chargerMessages(c.id);
+        else if (actif) setFils((prev) => ({ ...prev, [selectedId]: [] }));
+      } catch (e) {
+        if (actif) toast(e?.message || "Impossible de charger la conversation", "error");
+      } finally {
+        if (actif) setChargementFil(false);
+      }
+    })();
+
+    return () => {
+      actif = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, employes, conversations]);
 
   useEffect(() => {
     finFilRef.current?.scrollIntoView({ block: "end" });
   }, [selectedId, messages.length]);
 
   const apercu = (id) => {
+    if (id === "ALL") {
+      // Aperçu du dernier message diffusé local, le cas échéant.
+      const f = fils[id];
+      if (f && f.length) {
+        const m = f[f.length - 1];
+        const t = m.type === "document" ? "📎 " + m.nom : m.texte;
+        return { texte: (m.de === "moi" ? "Vous : " : "") + t, heure: m.heure };
+      }
+      return { texte: "Diffusion à tout le personnel", heure: "" };
+    }
+    // Aperçu depuis le résumé API de la conversation directe (dernier_message).
+    const emp = employes.find((e) => e.id === id);
+    const c = emp?._id != null ? convDirecteDe(emp._id) : null;
+    const dm = c?.dernier_message;
+    if (dm) return { texte: (dm.mien ? "Vous : " : "") + (dm.apercu ?? ""), heure: heureDe(dm.created_at) };
     const f = fils[id];
-    if (!f || !f.length) return { texte: "Aucun message", heure: "" };
-    const m = f[f.length - 1];
-    const t = m.type === "document" ? "📎 " + m.nom : m.texte;
-    return { texte: (m.de === "moi" ? "Vous : " : "") + t, heure: m.heure };
+    if (f && f.length) {
+      const m = f[f.length - 1];
+      const t = m.type === "document" ? "📎 " + m.nom : m.texte;
+      return { texte: (m.de === "moi" ? "Vous : " : "") + t, heure: m.heure };
+    }
+    return { texte: "Aucun message", heure: "" };
   };
 
   const ajouter = (msg) => setFils((prev) => ({ ...prev, [selectedId]: [...(prev[selectedId] || []), msg] }));
   const heureNow = () => new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-  function envoyer() {
+  async function envoyer() {
     const t = texte.trim();
     if (!t || !selectedId) return;
-    ajouter({ de: "moi", texte: t, heure: heureNow() });
     setTexte("");
-    if (conv?.broadcast) toast(`Message diffusé à ${employes.length} membres.`, "success");
+
+    if (conv?.broadcast) {
+      // Diffusion « Tout le personnel » via le canal annonce.
+      try {
+        await apiPost("/api/conversations/broadcast", { contenu: t });
+        ajouter({ de: "moi", texte: t, heure: heureNow() });
+        toast(`Message diffusé à ${employes.length} membres.`, "success");
+      } catch (e) {
+        toast(e?.message || "Échec de la diffusion", "error");
+      }
+      return;
+    }
+
+    // Message direct : envoi à la conversation du collègue sélectionné.
+    const emp = employes.find((e) => e.id === selectedId);
+    const c = emp?._id != null ? convDirecteDe(emp._id) : null;
+    if (!c?.id) {
+      toast("Conversation indisponible.", "error");
+      return;
+    }
+    // Affichage optimiste.
+    ajouter({ de: "moi", texte: t, heure: heureNow() });
+    try {
+      await apiPost(`/api/conversations/${c.id}/messages`, { type: "texte", contenu: t });
+    } catch (e) {
+      toast(e?.message || "Échec de l'envoi", "error");
+    }
   }
   function onFile(e) {
     const f = e.target.files?.[0];
     if (!f) return;
+    // TODO: endpoint API manquant pour l'upload de fichier (POST /api/fichiers -> fichier_id) ;
+    // l'envoi de pièce jointe nécessite un fichier_id. Affichage local uniquement pour l'instant.
     ajouter({ de: "moi", type: "document", nom: f.name, taille: `${Math.max(1, Math.round(f.size / 1024))} Ko`, heure: heureNow() });
     toast(conv?.broadcast ? `Document diffusé à ${employes.length} membres.` : `Document « ${f.name} » envoyé.`, "success");
     e.target.value = "";
   }
   function onKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyer(); }
+  }
+
+  if (chargement) {
+    return (
+      <div className={embedded ? "" : "reveal"}>
+        {!embedded && <PageHeader title="Messagerie" subtitle="Écrivez à un collègue ou à tout le personnel — message ou document." />}
+        <div className="card py-16 text-center">
+          <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+          <p className="mt-2 text-sm text-muted">Chargement de la messagerie…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <div className={embedded ? "" : "reveal"}>
+        {!embedded && <PageHeader title="Messagerie" subtitle="Écrivez à un collègue ou à tout le personnel — message ou document." />}
+        <div className="card py-16 text-center">
+          <Icon name="error" className="text-rose-500 text-[40px]" />
+          <p className="mt-2 text-sm text-muted">{erreur}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -199,7 +318,11 @@ export default function Messagerie({ embedded = false }) {
                     </div>
                   );
                 })}
-                {messages.length === 0 && <p className="m-auto text-sm text-subtle">Aucun message — démarrez la conversation.</p>}
+                {messages.length === 0 && (
+                  <p className="m-auto text-sm text-subtle">
+                    {chargementFil ? "Chargement de la conversation…" : "Aucun message — démarrez la conversation."}
+                  </p>
+                )}
                 <div ref={finFilRef} />
               </div>
 

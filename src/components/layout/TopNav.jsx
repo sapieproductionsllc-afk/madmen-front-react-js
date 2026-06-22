@@ -4,7 +4,9 @@ import Icon from "../ui/Icon.jsx";
 import Avatar from "../ui/Avatar.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { alertes, employes, agencesList } from "../../data/datasets.js";
+import { agencesList } from "../../data/datasets.js";
+import { apiGet } from "../../lib/api.js";
+import { mapEmploye } from "../../lib/mappers.js";
 import logo from "../../assets/logo.png";
 
 // Photo de l'admin connecté (déterministe par matricule — cohérente avec la page profil).
@@ -16,6 +18,34 @@ const couleurAlerte = {
   Moyen: "bg-amber-50 text-amber-600",
   Faible: "bg-slate-50 text-slate-600",
 };
+
+// Normalise la sévérité de l'API vers les clés attendues par le JSX (Critique/Moyen/Faible).
+function normSeverite(s) {
+  const v = String(s ?? "").toLowerCase();
+  if (v.startsWith("crit") || v === "haute" || v === "high" || v === "élevé" || v === "eleve") return "Critique";
+  if (v.startsWith("moy") || v === "medium" || v === "warning") return "Moyen";
+  return "Faible";
+}
+
+// Extrait un HH:MM affichable depuis l'horodatage API (ISO, "HH:MM:SS", timestamp…).
+function heureAlerte(h) {
+  if (!h) return "00:00";
+  const m = String(h).match(/(\d{2}):(\d{2})/);
+  return m ? `${m[1]}:${m[2]}` : "00:00";
+}
+
+// Mapping API (GET /api/alertes) -> forme exacte attendue par le JSX (mêmes champs que l'ancien mock).
+function mapAlerte(a) {
+  return {
+    id: a.id,
+    type: a.type || "Alerte",
+    severity: normSeverite(a.severite),
+    agence: a.agence || "—", // absent de l'API -> neutre (pas de champ agence renvoyé)
+    time: heureAlerte(a.horodatage),
+    message: a.message || "",
+    read: Boolean(a.lu),
+  };
+}
 
 function ItemMenu({ icon, label, onClick, to, state, danger }) {
   const classe = `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -49,6 +79,10 @@ export default function TopNav({ onMenuClick }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef(null);
 
+  // Données RÉELLES depuis l'API (remplacent les mocks de src/data) : cloche + recherche globale.
+  const [alertes, setAlertes] = useState([]);
+  const [employes, setEmployes] = useState([]);
+
   // Raccourci Ctrl/⌘ + K
   useEffect(() => {
     const h = (e) => {
@@ -60,6 +94,20 @@ export default function TopNav({ onMenuClick }) {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  // Chargement des alertes (cloche + compteur de non-lus) et des employés (recherche globale).
+  useEffect(() => {
+    Promise.all([apiGet("/api/alertes"), apiGet("/api/employes")])
+      .then(([al, emp]) => {
+        setAlertes((Array.isArray(al) ? al : []).map(mapAlerte));
+        setEmployes((Array.isArray(emp) ? emp : []).map(mapEmploye));
+      })
+      .catch(() => {
+        // Silencieux : la barre de navigation reste fonctionnelle, sans badge ni résultats.
+        setAlertes([]);
+        setEmployes([]);
+      });
   }, []);
 
   const nonLues = alertes.filter((a) => !a.read).length;

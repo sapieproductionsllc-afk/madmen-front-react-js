@@ -7,15 +7,13 @@ import StatusPill from "../components/ui/StatusPill.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
 import { Input, Select, Field, champClass } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes, demandes } from "../data/datasets.js";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/120?u=${encodeURIComponent(id)}`;
-const empById = Object.fromEntries(employes.map((e) => [e.id, e]));
-const collegues = employes.slice(0, 8);
 
 const ICONE_TYPE = { "Congé": "event", Permission: "schedule", "Avance sur salaire": "payments", Avance: "payments", Absence: "report", Autre: "description" };
 const TONE_STATUT = { "En attente": "amber", "Approuvée": "emerald", "Refusée": "rose" };
-const STATUTS_MOCK = ["En attente", "En attente", "Approuvée", "En attente", "Refusée"];
 const TYPES = ["Congé", "Permission", "Avance sur salaire", "Autre"];
 const CATS = [
   { key: "En attente", label: "À traiter" },
@@ -24,10 +22,34 @@ const CATS = [
   { key: "Refusée", label: "Refusées" },
 ];
 
-const demandesInitiales = demandes.map((d, i) => ({
-  id: d.id, employeId: d.employeId, type: d.type, periode: d.periode, motif: d.motif,
-  statut: STATUTS_MOCK[i % STATUTS_MOCK.length], soumisLe: d.soumisLe,
-}));
+// Traduit le statut renvoyé par l'API des demandes vers les libellés attendus par le front.
+const STATUT_API = {
+  en_attente: "En attente", "en attente": "En attente", attente: "En attente", pending: "En attente",
+  approuve: "Approuvée", approuvee: "Approuvée", "approuvée": "Approuvée", approved: "Approuvée", valide: "Approuvée", validee: "Approuvée",
+  refuse: "Refusée", refusee: "Refusée", "refusée": "Refusée", rejected: "Refusée", rejete: "Refusée", rejetee: "Refusée",
+};
+const mapStatut = (s) => STATUT_API[String(s ?? "").toLowerCase().trim()] || "En attente";
+
+// Compose une période lisible à partir des dates API (le mock avait un champ libre `periode`).
+const mapPeriode = (d) => {
+  const a = d.date_debut || "";
+  const b = d.date_fin || "";
+  if (a && b && a !== b) return `${a} → ${b}`;
+  return a || b || "—";
+};
+
+// Demande API -> forme attendue par le JSX (champs identiques au mock), avec le VRAI statut.
+function mapDemande(d) {
+  return {
+    id: d.reference || d.id, // identifiant métier (ex. DM-201) ; fallback id numérique
+    employeId: d.matricule || "", // lookup vers l'employé (indexé par matricule)
+    type: d.type || "Autre",
+    periode: mapPeriode(d),
+    motif: d.objet || "", // `objet` API = motif affiché
+    statut: mapStatut(d.statut),
+    soumisLe: d.soumisLe || "", // non garanti par l'API : valeur neutre
+  };
+}
 
 const filsSeed = {
   ALL: [
@@ -49,15 +71,38 @@ export default function Communication() {
   const [sel, setSel] = useState("demandes"); // "demandes" | "ALL" | matricule
   const [recherche, setRecherche] = useState("");
 
+  // --- Données RÉELLES depuis l'API (remplacent les mocks de src/data) ---
+  const [employes, setEmployes] = useState([]);
+  const [liste, setListe] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
   // --- Demandes ---
-  const [liste, setListe] = useState(demandesInitiales);
   const [catD, setCatD] = useState("En attente");
   const [formOuvert, setFormOuvert] = useState(false);
-  const [agent, setAgent] = useState(employes[0]?.id ?? "");
+  const [agent, setAgent] = useState("");
   const [type, setType] = useState("Congé");
   const [periode, setPeriode] = useState("");
   const [motif, setMotif] = useState("");
   const [compteur, setCompteur] = useState(301);
+
+  useEffect(() => {
+    setChargement(true);
+    setErreur(null);
+    Promise.all([apiGet("/api/employes"), apiGet("/api/demandes")])
+      .then(([emp, dem]) => {
+        const listeEmp = (Array.isArray(emp) ? emp : []).map(mapEmploye);
+        setEmployes(listeEmp);
+        setAgent((a) => a || listeEmp[0]?.id || "");
+        setListe((Array.isArray(dem) ? dem : []).map(mapDemande));
+      })
+      .catch((e) => setErreur(e?.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
+
+  const empById = useMemo(() => Object.fromEntries(employes.map((e) => [e.id, e])), [employes]);
+  const collegues = useMemo(() => employes.slice(0, 8), [employes]);
+
   const pending = liste.filter((d) => d.statut === "En attente").length;
   const compteCat = (k) => (k === "Toutes" ? liste.length : liste.filter((d) => d.statut === k).length);
   const filtreD = useMemo(() => (catD === "Toutes" ? liste : liste.filter((d) => d.statut === catD)), [liste, catD]);
@@ -114,7 +159,7 @@ export default function Communication() {
     const q = recherche.trim().toLowerCase();
     const arr = [{ id: "ALL", name: "Tout le personnel", broadcast: true }, ...collegues];
     return q ? arr.filter((e) => e.name.toLowerCase().includes(q)) : arr;
-  }, [recherche]);
+  }, [recherche, collegues]);
 
   const railItem = (actif) => `w-full flex items-center gap-3 px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${actif ? "bg-brand-50" : "hover:bg-surface-2"}`;
 
@@ -201,7 +246,13 @@ export default function Communication() {
                   </form>
                 )}
 
-                {filtreD.map((d) => {
+                {chargement && (
+                  <div className="card py-12 text-center"><Icon name="progress_activity" className="text-faint text-[36px] animate-spin" /><p className="mt-2 text-sm text-muted">Chargement des demandes…</p></div>
+                )}
+                {!chargement && erreur && (
+                  <div className="card py-12 text-center"><Icon name="error" className="text-rose-500 text-[36px]" /><p className="mt-2 text-sm text-muted">{erreur}</p></div>
+                )}
+                {!chargement && !erreur && filtreD.map((d) => {
                   const ag = d.employeId ? empById[d.employeId] : null;
                   return (
                     <div key={d.id} className="card p-4 flex items-start gap-3">
@@ -228,7 +279,7 @@ export default function Communication() {
                     </div>
                   );
                 })}
-                {filtreD.length === 0 && (
+                {!chargement && !erreur && filtreD.length === 0 && (
                   <div className="card py-12 text-center"><Icon name="inbox" className="text-faint text-[36px]" /><p className="mt-2 text-sm text-muted">Aucune demande dans cette catégorie.</p></div>
                 )}
               </div>

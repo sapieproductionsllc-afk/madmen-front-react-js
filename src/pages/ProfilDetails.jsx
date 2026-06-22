@@ -4,8 +4,12 @@ import Icon from "../components/ui/Icon.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import BandeauAgent from "../components/ui/BandeauAgent.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes, tempsReel } from "../data/datasets.js";
-import { employeDetails, historiqueActivite, activiteDetail, documentsEmploye, historiqueRH } from "../data/profil.js";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
+
+// Statut API (present/retard/absent/conge) -> statut « live » attendu par le BandeauAgent.
+// L'API n'expose pas de notion de « pause » : aucun agent ne tombera dans "En pause".
+const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé" };
 
 const tonePastille = {
   emerald: "bg-emerald-50 text-emerald-600",
@@ -15,6 +19,45 @@ const tonePastille = {
   brand: "bg-brand-50 text-brand-600",
   slate: "bg-slate-50 text-slate-600",
 };
+
+// ---------------------------------------------------------------- helpers data
+// Date/heure ISO -> "HH:MM" (heure locale du libellé renvoyé par l'API).
+const hhmm = (iso) => (iso ? String(iso).slice(11, 16) : "—");
+// Date ISO -> "JJ/MM/AAAA" pour l'affichage RH.
+function dateFr(iso) {
+  if (!iso) return "—";
+  const d = String(iso).slice(0, 10).split("-");
+  return d.length === 3 ? `${d[2]}/${d[1]}/${d[0]}` : String(iso);
+}
+// Date courte "12 juin" pour les frises/justifications.
+const MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+function dateCourte(iso) {
+  if (!iso) return "—";
+  const p = String(iso).slice(0, 10).split("-");
+  if (p.length !== 3) return String(iso);
+  return `${Number(p[2])} ${MOIS_COURTS[Number(p[1]) - 1] ?? p[1]}`;
+}
+// Octets -> libellé lisible (Ko / Mo) ; "—" si inconnu.
+function tailleFr(octets) {
+  if (octets == null) return "—";
+  if (octets >= 1024 * 1024) return `${(octets / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
+  if (octets >= 1024) return `${Math.round(octets / 1024)} Ko`;
+  return `${octets} o`;
+}
+// Type de document RH -> icône Material adaptée.
+const ICONE_DOC = { Contrat: "description", Identité: "badge", Paie: "receipt_long", RH: "edit_document" };
+const iconeDoc = (type) => ICONE_DOC[type] ?? "description";
+// Évènement RH -> icône + teinte de la frise.
+function styleRH(evenement = "") {
+  const e = evenement.toLowerCase();
+  if (e.includes("paie") || e.includes("salaire") || e.includes("augment")) return { icon: "payments", tone: "emerald" };
+  if (e.includes("avenant") || e.includes("contrat")) return { icon: "edit_document", tone: "sky" };
+  if (e.includes("poste") || e.includes("mutation")) return { icon: "swap_horiz", tone: "amber" };
+  if (e.includes("embauche") || e.includes("entrée")) return { icon: "person_add", tone: "brand" };
+  return { icon: "history", tone: "slate" };
+}
+// Date du jour YYYY-MM-DD (filtrage de l'activité du jour).
+const aujourdHui = () => new Date().toISOString().slice(0, 10);
 
 // Progression de défilement (repère passif, non cliquable) — écoute le scroller de Layout.
 function useScrollProgress() {
@@ -53,6 +96,9 @@ function InfoRow({ icon, label, value, href }) {
 
 // Frise HORIZONTALE : nœuds reliés sur une ligne, défile si trop d'étapes (gain de hauteur).
 function Timeline({ items, champTime = "time", champType = "type", champDetail = "detail" }) {
+  if (!items.length) {
+    return <p className="text-sm text-muted py-4 text-center">Aucune donnée disponible.</p>;
+  }
   return (
     <ol className="flex overflow-x-auto scroll-thin snap-x pb-1">
       {items.map((ev, i) => (
@@ -111,14 +157,81 @@ function Section({ id, icon, title, first, children }) {
 
 const ANCRES = { Résumé: "resume", Pointages: "pointages", Activité: "activite", Documents: "documents", Historique: "historique" };
 
+// Repli vide neutre (jamais de fausses données) en attendant le chargement / si endpoint absent.
+const VIDE = {
+  d: {},
+  activite: [],
+  actDetail: { connexions: [], deconnexions: [], inactivites: [], justifications: [] },
+  docs: [],
+  rh: [],
+};
+
 export default function ProfilDetails() {
-  const { id } = useParams();
+  const { id } = useParams(); // :id = matricule
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useUI();
   const progress = useScrollProgress();
 
-  const e = employes.find((x) => x.id === id);
+  // Données RÉELLES de l'API (remplacent intégralement les mocks de profil.js).
+  const [e, setE] = useState(null);
+  const [live, setLive] = useState("Absent");
+  const [detail, setDetail] = useState(VIDE); // d / activite / actDetail / docs / rh
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  useEffect(() => {
+    let actif = true;
+    setChargement(true);
+    setErreur(null);
+    setDetail(VIDE);
+
+    // 1) On résout l'employé via la liste (le param :id est le matricule) pour obtenir
+    //    son id NUMÉRIQUE, requis par les sous-ressources (/employes/{id}/…).
+    Promise.all([apiGet("/api/employes"), apiGet("/api/dashboard/presence")])
+      .then(([employesData, presence]) => {
+        const empApi = (Array.isArray(employesData) ? employesData : []).find((x) => x.matricule === id);
+        if (!empApi) {
+          if (actif) {
+            setE(null);
+            setChargement(false);
+          }
+          return null;
+        }
+
+        const emp = mapEmploye(empApi);
+        const nid = empApi.id; // id numérique pour les appels suivants
+        const ag = (presence?.agents ?? []).find((a) => a.matricule === id || a.id === empApi.id);
+
+        if (actif) {
+          setE(emp);
+          setLive(ag ? STATUT_LIVE[ag.statut] ?? "Absent" : "Absent");
+        }
+
+        const jour = aujourdHui();
+        // 2) Sous-ressources RH/activité de l'agent. `.catch(()=>défaut)` sur chacune :
+        //    une donnée absente -> état vide neutre, sans casser le reste de la page.
+        return Promise.all([
+          apiGet(`/api/employes/${nid}/documents`).catch(() => []),
+          apiGet(`/api/employes/${nid}/historique-rh`).catch(() => []),
+          apiGet(`/api/sessions?employe_id=${nid}`).catch(() => []),
+          apiGet(`/api/incidents?employe_id=${nid}&from=${jour}&to=${jour}`).catch(() => []),
+        ]).then(([documents, histo, sessions, incidents]) => {
+          if (!actif) return;
+          setDetail(construireDetail(empApi, documents, histo, sessions, incidents, jour));
+        });
+      })
+      .catch((err) => {
+        if (actif) setErreur(err?.message || "Erreur de chargement");
+      })
+      .finally(() => {
+        if (actif) setChargement(false);
+      });
+
+    return () => {
+      actif = false;
+    };
+  }, [id]);
 
   // Défilement vers la section demandée (ex. arrivée depuis « Voir le détail des pointages »).
   useEffect(() => {
@@ -130,6 +243,27 @@ export default function ProfilDetails() {
     });
     return () => cancelAnimationFrame(raf);
   }, [location.state, location.pathname, navigate]);
+
+  if (chargement) {
+    return (
+      <div className="card py-16 text-center max-w-lg mx-auto">
+        <Icon name="progress_activity" className="text-brand-600 text-[40px] animate-spin" />
+        <p className="mt-2 text-sm text-muted">Chargement du dossier agent…</p>
+      </div>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <div className="card py-16 text-center max-w-lg mx-auto">
+        <Icon name="error" className="text-rose-500 text-[40px]" />
+        <p className="mt-2 text-sm text-muted">{erreur}</p>
+        <button onClick={() => navigate("/")} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700">
+          <Icon name="arrow_back" className="text-[18px]" /> Retour au tableau de bord
+        </button>
+      </div>
+    );
+  }
 
   if (!e) {
     return (
@@ -143,13 +277,7 @@ export default function ProfilDetails() {
     );
   }
 
-  const d = employeDetails[id] ?? {};
-  const tr = tempsReel[id] ?? {};
-  const live = tr.live ?? "Absent";
-  const activite = historiqueActivite(id);
-  const actDetail = activiteDetail(id);
-  const docs = documentsEmploye(id);
-  const rh = historiqueRH(id);
+  const { d, activite, actDetail, docs, rh } = detail;
 
   return (
     <div className="space-y-7 pb-12">
@@ -269,24 +397,28 @@ export default function ProfilDetails() {
 
       {/* ---------- DOCUMENTS ---------- */}
       <Section id="documents" icon="folder" title="Documents">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {docs.map((doc) => (
-            <button
-              key={doc.nom}
-              onClick={() => toast(`Téléchargement de « ${doc.nom} »`, "info")}
-              className="group card card-hover p-4 flex items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-            >
-              <span className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-                <Icon name={doc.icon} className="text-[22px]" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-ink truncate">{doc.nom}</p>
-                <p className="text-xs text-subtle">{doc.type} · {doc.date} · {doc.size}</p>
-              </div>
-              <Icon name="download" className="text-subtle group-hover:text-brand-600 text-[20px]" />
-            </button>
-          ))}
-        </div>
+        {docs.length === 0 ? (
+          <p className="text-sm text-muted">Aucun document disponible.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {docs.map((doc) => (
+              <button
+                key={doc.nom}
+                onClick={() => toast(`Téléchargement de « ${doc.nom} »`, "info")}
+                className="group card card-hover p-4 flex items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+              >
+                <span className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                  <Icon name={doc.icon} className="text-[22px]" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-ink truncate">{doc.nom}</p>
+                  <p className="text-xs text-subtle">{doc.type} · {doc.date} · {doc.size}</p>
+                </div>
+                <Icon name="download" className="text-subtle group-hover:text-brand-600 text-[20px]" />
+              </button>
+            ))}
+          </div>
+        )}
       </Section>
 
       {/* ---------- HISTORIQUE ---------- */}
@@ -298,4 +430,93 @@ export default function ProfilDetails() {
       </Section>
     </div>
   );
+}
+
+// ---------------------------------------------------------------- mapping API
+// Construit la forme EXACTE attendue par le JSX à partir des réponses API.
+function construireDetail(empApi, documents, histo, sessions, incidents, jour) {
+  // Détail RH (Résumé) — issu de /api/employes/{id} (déjà chargé dans la liste enrichie).
+  // sexe/naissance ne sont PAS exposés par l'API -> non affichés ici (le JSX ne les utilise pas).
+  const d = {
+    adresse: empApi.adresse || "—",
+    manager: empApi.manager_nom?.trim() || "—",
+    embauche: dateFr(empApi.created_at),
+    urgence:
+      empApi.contact_urgence_nom || empApi.contact_urgence_tel
+        ? { nom: empApi.contact_urgence_nom || "—", lien: "Contact d'urgence", tel: empApi.contact_urgence_tel || "—" }
+        : null,
+  };
+
+  // Documents RH -> { nom, type, date, icon, size } attendu par le JSX.
+  const docs = (Array.isArray(documents) ? documents : []).map((doc) => ({
+    nom: doc.titre,
+    type: doc.type || "RH",
+    date: dateFr(doc.created_at),
+    icon: iconeDoc(doc.type),
+    size: tailleFr(doc.taille_octets),
+  }));
+
+  // Historique RH -> frise { date, type, detail, icon, tone }.
+  const rh = (Array.isArray(histo) ? histo : []).map((h) => {
+    const s = styleRH(h.evenement);
+    return { date: dateFr(h.date), type: h.evenement, detail: h.detail || "", icon: s.icon, tone: s.tone };
+  });
+
+  // Sessions du jour (connexions/déconnexions) + Journal chronologique du jour.
+  const sessionsJour = (Array.isArray(sessions) ? sessions : []).filter(
+    (s) => String(s.heure_debut ?? "").slice(0, 10) === jour
+  );
+  const poste = (s) => (s.poste_travail_id != null ? String(s.poste_travail_id) : "distant");
+  const connexions = sessionsJour
+    .filter((s) => s.heure_debut)
+    .map((s) => ({ time: hhmm(s.heure_debut), poste: poste(s) }));
+  const deconnexions = sessionsJour
+    .filter((s) => s.heure_fin)
+    .map((s) => ({ time: hhmm(s.heure_fin), motif: "Fin de session" }));
+
+  // Incidents d'inactivité du jour -> inactivités + justifications (motif renseigné).
+  const incJour = Array.isArray(incidents) ? incidents : [];
+  const inactivites = incJour.map((i) => ({
+    debut: hhmm(i.heure_verrouillage),
+    duree: i.duree_minutes != null ? `${i.duree_minutes} min` : "—",
+  }));
+  const justifications = incJour
+    .filter((i) => i.motif || i.justification)
+    .map((i) => ({
+      date: dateCourte(i.heure_verrouillage),
+      motif: i.motif || i.justification,
+      statut: i.statut === "justifie" ? "Approuvée" : i.statut || "—",
+    }));
+
+  // Journal du jour : connexions + déconnexions, classés par heure (frise horizontale).
+  const activite = [
+    ...sessionsJour.filter((s) => s.heure_debut).map((s) => ({
+      time: hhmm(s.heure_debut),
+      type: "Connexion",
+      detail: `Poste ${poste(s)}`,
+      icon: "login",
+      tone: "emerald",
+      _t: s.heure_debut,
+    })),
+    ...sessionsJour.filter((s) => s.heure_fin).map((s) => ({
+      time: hhmm(s.heure_fin),
+      type: "Déconnexion",
+      detail: `Poste ${poste(s)}`,
+      icon: "logout",
+      tone: "slate",
+      _t: s.heure_fin,
+    })),
+    ...incJour.map((i) => ({
+      time: hhmm(i.heure_verrouillage),
+      type: "Inactivité",
+      detail: i.motif || i.justification || "Poste verrouillé",
+      icon: "motion_photos_paused",
+      tone: "amber",
+      _t: i.heure_verrouillage,
+    })),
+  ]
+    .sort((a, b) => String(a._t).localeCompare(String(b._t)))
+    .map(({ _t, ...ev }) => ev);
+
+  return { d, activite, actDetail: { connexions, deconnexions, inactivites, justifications }, docs, rh };
 }

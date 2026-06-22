@@ -1,17 +1,192 @@
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
 import BandeauAgent from "../components/ui/BandeauAgent.jsx";
 import CalendrierPresence from "../components/ui/CalendrierPresence.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes, tempsReel } from "../data/datasets.js";
-import { calendrierPresence } from "../data/profil.js";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
+
+// API statut (present/retard/absent/conge) -> statut live attendu par le JSX/BandeauAgent.
+const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé" };
+
+// API status (PRESENT/LATE/ABSENT) -> état de pointage attendu par CalendrierPresence.
+const ETAT_API = { PRESENT: "Présent", LATE: "Retard", ABSENT: "Absent" };
+
+// Libellés FR des mois (le composant lit cal.mois sous la forme "Mois AAAA").
+const MOIS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+
+// "HH:MM:SS" | "AAAA-MM-JJ HH:MM:SS" -> "HH:MM" (ou null).
+function hhmm(v) {
+  if (!v) return null;
+  const s = String(v);
+  const m = s.match(/(\d{2}):(\d{2})/);
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
+/**
+ * Reconstruit la grille mensuelle attendue par CalendrierPresence à partir du
+ * bulletin de paie (GET /api/employes/{id}/paie). On garde EXACTEMENT la forme
+ * produite par l'ancien mock calendrierPresence() de profil.js.
+ * - planning : objet { isoJour(1=lun..7=dim) -> {debut,fin} } ; un jour présent = jour travaillé (cours).
+ * - detail[] : une entrée par jour pointé/absent/férié, indexée par date, avec status.
+ */
+function construireCalendrier(paie) {
+  const mois = paie?.mois ?? null; // "AAAA-MM"
+  const planning = paie?.planning ?? {}; // { "1": {debut,fin}, ... }
+  const valeurHeure = Number(paie?.valeur_heure) || 0;
+
+  const detailParDate = Object.fromEntries((paie?.detail ?? []).map((d) => [d.date, d]));
+
+  let annee, moisNum;
+  if (mois) {
+    const [a, mn] = mois.split("-").map(Number);
+    annee = a;
+    moisNum = mn; // 1..12
+  } else {
+    const now = new Date();
+    annee = now.getFullYear();
+    moisNum = now.getMonth() + 1;
+  }
+
+  const nbJours = new Date(annee, moisNum, 0).getDate(); // dernier jour du mois
+  const today = new Date();
+  const estMoisCourant = today.getFullYear() === annee && today.getMonth() + 1 === moisNum;
+  const todayJour = estMoisCourant ? today.getDate() : -1;
+
+  const jours = [];
+  let joursCours = 0;
+  let coursEcoules = 0;
+  let joursPointes = 0;
+
+  for (let d = 1; d <= nbJours; d++) {
+    const date = `${annee}-${String(moisNum).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const jsDow = new Date(annee, moisNum - 1, d).getDay(); // 0=dim..6=sam
+    const iso = jsDow === 0 ? 7 : jsDow; // 1=lun..7=dim
+    const dow = iso - 1; // 0=lun..6=dim (attendu par le composant)
+    const weekend = iso >= 6; // samedi/dimanche
+
+    const det = detailParDate[date] ?? null;
+    const ferie = det?.status === "FERIE" ? det.libelle ?? "Jour férié" : null;
+    const event = null; // TODO: endpoint API manquant pour les événements pédagogiques du calendrier
+    const cours = !!planning[String(iso)] && !ferie; // jour travaillé prévu (hors férié)
+    const futur = todayJour >= 0 && d > todayJour;
+
+    let etat = null; // "Présent" | "Retard" | "Absent" | "Prévu"
+    let arrivee = null;
+    let retardMin = 0;
+
+    if (cours) {
+      joursCours++;
+      if (det && ETAT_API[det.status]) {
+        coursEcoules++;
+        etat = ETAT_API[det.status];
+        if (det.status === "PRESENT" || det.status === "LATE") {
+          arrivee = hhmm(det.check_in);
+          retardMin = Math.round((Number(det.late_seconds) || 0) / 60);
+          joursPointes++;
+        }
+      } else if (futur) {
+        etat = "Prévu"; // jour à venir, à pointer
+      } else {
+        // Jour ouvré passé sans détail (ni pointage ni absence calculée) -> à pointer.
+        etat = "Prévu";
+      }
+    }
+
+    jours.push({ jour: d, dow, weekend, ferie, event, cours, futur, today: d === todayJour, etat, arrivee, retardMin });
+  }
+
+  const heuresPlanifiees = (Number(paie?.temps_theorique_mensuel_sec) || 0) / 3600;
+  const heuresTravaillees = (Number(paie?.temps_total_travaille_sec) || 0) / 3600;
+
+  return {
+    mois: mois ? `${MOIS_FR[moisNum - 1]} ${annee}` : "—",
+    today: todayJour,
+    jours,
+    joursCours,
+    coursEcoules,
+    joursPointes,
+    heuresPlanifiees: Math.round(heuresPlanifiees),
+    heuresTravaillees: Math.round(heuresTravaillees),
+    tauxPresence: coursEcoules ? Math.round((joursPointes / coursEcoules) * 100) : 0,
+    tauxHoraire: Math.round(valeurHeure),
+    remunerationEstimee: Math.round(heuresTravaillees * valeurHeure),
+  };
+}
 
 export default function ProfilEmploye() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useUI();
 
-  const e = employes.find((x) => x.id === id);
+  // Données RÉELLES depuis l'API (remplacent les mocks de src/data/datasets.js).
+  const [e, setE] = useState(null);
+  const [live, setLive] = useState("Absent");
+  const [cal, setCal] = useState(null); // calendrier de présence reconstruit depuis la paie du mois
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  useEffect(() => {
+    let actif = true;
+    setChargement(true);
+    setErreur(null);
+
+    // Employé (liste -> recherche par matricule, le param :id est le matricule)
+    // + présence temps réel (agents[] de /api/dashboard/presence indexé par matricule).
+    Promise.all([apiGet("/api/employes"), apiGet("/api/dashboard/presence")])
+      .then(([employesData, presence]) => {
+        if (!actif) return null;
+
+        const agentApi = (Array.isArray(employesData) ? employesData : []).find((x) => x.matricule === id);
+        const agent = agentApi ? mapEmploye(agentApi) : null;
+
+        const ag = (presence?.agents ?? []).find((a) => a.matricule === id || a.id === agentApi?.id);
+        const statutLive = ag ? STATUT_LIVE[ag.statut] ?? "Absent" : "Absent";
+
+        setE(agent);
+        setLive(statutLive);
+
+        // Calendrier de présence : bulletin de paie du mois courant (par id numérique).
+        if (!agentApi?.id) return null;
+        const moisCourant = new Date().toISOString().slice(0, 7); // AAAA-MM
+        return apiGet(`/api/employes/${agentApi.id}/paie?mois=${moisCourant}`);
+      })
+      .then((paie) => {
+        if (actif && paie) setCal(construireCalendrier(paie));
+      })
+      .catch((err) => {
+        if (actif) setErreur(err?.message || "Erreur de chargement");
+      })
+      .finally(() => {
+        if (actif) setChargement(false);
+      });
+
+    return () => {
+      actif = false;
+    };
+  }, [id]);
+
+  if (chargement) {
+    return (
+      <div className="card py-16 text-center max-w-lg mx-auto">
+        <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+        <p className="mt-2 text-sm text-muted">Chargement de l'agent…</p>
+      </div>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <div className="card py-16 text-center max-w-lg mx-auto">
+        <Icon name="error" className="text-rose-500 text-[40px]" />
+        <p className="mt-2 text-sm text-muted">{erreur}</p>
+        <button onClick={() => navigate("/")} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700">
+          <Icon name="arrow_back" className="text-[18px]" /> Retour au tableau de bord
+        </button>
+      </div>
+    );
+  }
 
   if (!e) {
     return (
@@ -25,9 +200,20 @@ export default function ProfilEmploye() {
     );
   }
 
-  const tr = tempsReel[id] ?? {};
-  const live = tr.live ?? "Absent";
-  const cal = calendrierPresence(id);
+  // Calendrier reconstruit depuis la paie ; repli VIDE neutre si le bulletin est indisponible.
+  const calAffiche = cal ?? {
+    mois: `${MOIS_FR[new Date().getMonth()]} ${new Date().getFullYear()}`,
+    today: -1,
+    jours: [],
+    joursCours: 0,
+    coursEcoules: 0,
+    joursPointes: 0,
+    heuresPlanifiees: 0,
+    heuresTravaillees: 0,
+    tauxPresence: 0,
+    tauxHoraire: 0,
+    remunerationEstimee: 0,
+  };
 
   return (
     <div className="space-y-4 pb-10">
@@ -43,7 +229,7 @@ export default function ProfilEmploye() {
       <BandeauAgent
         e={e}
         live={live}
-        tauxHoraire={cal.tauxHoraire}
+        tauxHoraire={calAffiche.tauxHoraire}
         onPaiements={() => navigate(`/employes/${id}/paiement`)}
         onPlus={() => navigate(`/employes/${id}/details`)}
         plusLabel="Plus de détails"
@@ -52,8 +238,8 @@ export default function ProfilEmploye() {
 
       {/* Calendrier de présence */}
       <CalendrierPresence
-        cal={cal}
-        onJour={(j) => toast(`Journée du ${j.jour} juin — ${j.ferie ?? j.event ?? (j.etat === "Prévu" ? "à pointer" : j.etat) ?? "repos"}`, "info")}
+        cal={calAffiche}
+        onJour={(j) => toast(`Journée du ${j.jour} ${calAffiche.mois.split(" ")[0].toLowerCase()} — ${j.ferie ?? j.event ?? (j.etat === "Prévu" ? "à pointer" : j.etat) ?? "repos"}`, "info")}
       />
 
       {/* Bande pointages → feuille de pointage éditable (admin) */}

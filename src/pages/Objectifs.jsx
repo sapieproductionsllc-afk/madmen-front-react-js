@@ -7,11 +7,10 @@ import Avatar from "../components/ui/Avatar.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import Modal from "../components/ui/Modal.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes } from "../data/datasets.js";
 import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/80?u=${encodeURIComponent(id)}`;
-const empById = Object.fromEntries(employes.map((e) => [e.id, e]));
 
 const COULEUR_CATEGORIE = {
   Performance: "bg-emerald-50 text-emerald-600",
@@ -57,7 +56,7 @@ function formatDate(iso) {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-function Membres({ ids }) {
+function Membres({ ids, empById = {} }) {
   return (
     <div className="flex -space-x-2">
       {ids.slice(0, 4).map((id) => (
@@ -69,7 +68,7 @@ function Membres({ ids }) {
 }
 
 // Sélecteur de membres (tout le personnel ou agents précis) — recherche + compteur.
-function SelecteurMembres({ tous, setTous, ids, setIds }) {
+function SelecteurMembres({ tous, setTous, ids, setIds, employes = [] }) {
   const [q, setQ] = useState("");
   const toggle = (id) => setIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const filtres = employes.filter((e) => e.name.toLowerCase().includes(q.trim().toLowerCase()));
@@ -105,7 +104,7 @@ function SelecteurMembres({ tous, setTous, ids, setIds }) {
   );
 }
 
-function CarteObjectif({ objectif, onGerer, onSupprimer }) {
+function CarteObjectif({ objectif, onGerer, onSupprimer, empById = {} }) {
   const couleur = COULEUR_CATEGORIE[objectif.categorie] ?? "bg-surface-2 text-muted";
   const icone = ICONE_CATEGORIE[objectif.categorie] ?? "flag";
   const enRetard = objectif.statut !== "Atteint" && objectif.echeance && new Date(objectif.echeance + "T00:00:00") < new Date();
@@ -135,7 +134,7 @@ function CarteObjectif({ objectif, onGerer, onSupprimer }) {
           objectif.tous ? (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 bg-brand-50 px-2 py-1 rounded-full"><Icon name="groups" className="text-[14px]" filled /> Tout le personnel</span>
           ) : (
-            <span className="inline-flex items-center gap-2 min-w-0" title={`${objectif.membres.length} agent(s)`}><Membres ids={objectif.membres} /><span className="text-xs text-muted">{objectif.membres.length} agent{objectif.membres.length > 1 ? "s" : ""}</span></span>
+            <span className="inline-flex items-center gap-2 min-w-0" title={`${objectif.membres.length} agent(s)`}><Membres ids={objectif.membres} empById={empById} /><span className="text-xs text-muted">{objectif.membres.length} agent{objectif.membres.length > 1 ? "s" : ""}</span></span>
           )
         ) : (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted bg-surface-2 border border-border px-2 py-1 rounded-full"><Icon name="lock_person" className="text-[14px]" /> Personnel</span>
@@ -152,19 +151,26 @@ function CarteObjectif({ objectif, onGerer, onSupprimer }) {
 export default function Objectifs() {
   const { toast, confirm } = useUI();
   const [objectifs, setObjectifs] = useState([]);
+  const [employes, setEmployes] = useState([]); // annuaire (sélection / partage) via /api/employes
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
   const [cat, setCat] = useState("Tous");
 
-  // Charge les VRAIS objectifs de l'employé connecté (JWT géré par api.js).
+  // Charge les VRAIS objectifs de l'employé connecté + l'annuaire (JWT géré par api.js).
   useEffect(() => {
     setChargement(true);
     setErreur(null);
-    apiGet("/api/me/objectifs")
-      .then((data) => setObjectifs(Array.isArray(data) ? data.map(mapObjectif) : []))
+    Promise.all([apiGet("/api/me/objectifs"), apiGet("/api/employes")])
+      .then(([objs, emps]) => {
+        setObjectifs(Array.isArray(objs) ? objs.map(mapObjectif) : []);
+        setEmployes(Array.isArray(emps) ? emps.map(mapEmploye) : []);
+      })
       .catch((e) => setErreur(e?.message || "Impossible de charger les objectifs."))
       .finally(() => setChargement(false));
   }, []);
+
+  // Index matricule -> employé (résolution des noms des membres partagés).
+  const empById = useMemo(() => Object.fromEntries(employes.map((e) => [e.id, e])), [employes]);
 
   // Création
   const [titre, setTitre] = useState("");
@@ -241,7 +247,7 @@ export default function Objectifs() {
           <div className="mt-3">
             <Field label="Portée">{segPortee(portee, setPortee)}</Field>
           </div>
-          {portee === "Partagé" && <div className="mt-3"><SelecteurMembres tous={fTous} setTous={setFTous} ids={fIds} setIds={setFIds} /></div>}
+          {portee === "Partagé" && <div className="mt-3"><SelecteurMembres tous={fTous} setTous={setFTous} ids={fIds} setIds={setFIds} employes={employes} /></div>}
           <div className="mt-4 flex justify-end">
             <Button type="submit" variant="primary" icon="add" disabled={creationInvalide}>Ajouter l'objectif</Button>
           </div>
@@ -275,7 +281,7 @@ export default function Objectifs() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {liste.map((o) => <CarteObjectif key={o.id} objectif={o} onGerer={ouvrirGerer} onSupprimer={supprimer} />)}
+          {liste.map((o) => <CarteObjectif key={o.id} objectif={o} onGerer={ouvrirGerer} onSupprimer={supprimer} empById={empById} />)}
         </div>
       )}
 
@@ -301,7 +307,7 @@ export default function Objectifs() {
         {/* Partage */}
         <div className="mt-5 pt-4 border-t border-border">
           <Field label="Portée">{segPortee(ePortee, setEPortee)}</Field>
-          {ePortee === "Partagé" && <div className="mt-3"><SelecteurMembres tous={eTous} setTous={setETous} ids={eIds} setIds={setEIds} /></div>}
+          {ePortee === "Partagé" && <div className="mt-3"><SelecteurMembres tous={eTous} setTous={setETous} ids={eIds} setIds={setEIds} employes={employes} /></div>}
         </div>
       </Modal>
     </div>

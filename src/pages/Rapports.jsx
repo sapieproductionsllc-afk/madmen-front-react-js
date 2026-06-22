@@ -7,12 +7,9 @@ import AreaChart from "../components/ui/AreaChart.jsx";
 import { FilterSelect } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { apiGet } from "../lib/api.js";
-import { employes } from "../data/datasets.js";
+import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/80?u=${encodeURIComponent(id)}`;
-// La liste des options du filtre « service » reste alimentée par les départements connus
-// (peuple le menu déroulant — design inchangé) ; les données affichées viennent de l'API.
-const services = ["Tous services", ...Array.from(new Set(employes.map((e) => e.department)))];
 const TRACK = "#ece4d3"; // piste des anneaux (sand-soft, palette crème)
 const COL = { emerald: "#1f9d63", brand: "#1f4a3a", sky: "#3f7cc4", or: "#b8882a", amber: "#b5651a", rose: "#d9614b" };
 
@@ -146,23 +143,30 @@ export default function Rapports() {
 
   const [stats, setStats] = useState(STATS_VIDE);
   const [classement, setClassement] = useState([]);
+  const [employes, setEmployes] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
 
   // Données RÉELLES depuis l'API (remplace les mocks de src/data).
   // Le filtre « service » est transmis à la synthèse ; on relance au changement.
+  // /api/employes alimente la liste des départements du menu déroulant « service ».
   useEffect(() => {
     setChargement(true);
     setErreur(null);
     const q = service && service !== "Tous services" ? `?service=${encodeURIComponent(service)}` : "";
-    Promise.all([apiGet(`/api/rapports/synthese${q}`), apiGet("/api/productivite/classement")])
-      .then(([synthese, clt]) => {
+    Promise.all([apiGet(`/api/rapports/synthese${q}`), apiGet("/api/productivite/classement"), apiGet("/api/employes")])
+      .then(([synthese, clt, emp]) => {
         setStats(mapSynthese(synthese));
         setClassement(mapClassement(clt));
+        setEmployes((Array.isArray(emp) ? emp : []).map(mapEmploye));
       })
       .catch((e) => setErreur(e.message || "Erreur de chargement"))
       .finally(() => setChargement(false));
   }, [service]);
+
+  // La liste des options du filtre « service » est alimentée par les départements
+  // réels des employés (peuple le menu déroulant — design inchangé).
+  const services = useMemo(() => ["Tous services", ...Array.from(new Set(employes.map((e) => e.department)))], [employes]);
 
   // Nombre d'agents affiché dans l'en-tête du classement.
   const nbAgents = useMemo(() => classement.length, [classement]);

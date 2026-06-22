@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Avatar from "./Avatar.jsx";
 import Icon from "./Icon.jsx";
 import Modal from "./Modal.jsx";
@@ -6,7 +6,22 @@ import Button from "./Button.jsx";
 import { Input, Field } from "./Input.jsx";
 import { useUI } from "./UIProvider.jsx";
 import { fcfa } from "../../data/datasets.js";
-import { paieDetail } from "../../data/profil.js";
+import { apiGet } from "../../lib/api.js";
+
+// Fiche de paie résumée VRAIE (GET /api/employes/{id}/paie?mois=YYYY-MM) -> forme { base, primes, avances, retenues, net, status }.
+// base = salaire_brut ; retenues = deduction_retard + deduction_absence ; net = salaire_net ;
+// primes/avances repris du bulletin si exposés (sinon 0) ; status dérivé de paie_calculable.
+function mapPaie(p) {
+  if (!p) return { base: 0, primes: 0, avances: 0, retenues: 0, net: 0, status: "En attente" };
+  return {
+    base: Number(p.salaire_brut) || 0,
+    primes: Number(p.primes) || 0,
+    avances: Number(p.avances) || 0,
+    retenues: (Number(p.deduction_retard) || 0) + (Number(p.deduction_absence) || 0),
+    net: Number(p.salaire_net) || 0,
+    status: p.paie_calculable ? "Payé" : "En attente",
+  };
+}
 
 // Photo déterministe par employé (repli initiales géré par <Avatar> si hors-ligne).
 const photoDe = (id) => `https://i.pravatar.cc/240?u=${encodeURIComponent(id)}`;
@@ -26,9 +41,30 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
     department: e.department ?? "",
     email: e.email,
     phone: e.phone,
-    salaire: paieDetail(e.id).net,
+    salaire: 0, // net du bulletin (chargé depuis l'API ci-dessous)
     photo: null,
   });
+
+  // Fiche de paie résumée RÉELLE du mois courant -> alimente le salaire net affiché.
+  // L'id numérique sert au endpoint (e._id) ; repli sur e.id si absent.
+  useEffect(() => {
+    let actif = true;
+    const idPaie = e._id ?? e.id;
+    if (!idPaie) return undefined;
+    const moisCourant = new Date().toISOString().slice(0, 7); // AAAA-MM
+    apiGet(`/api/employes/${idPaie}/paie?mois=${moisCourant}`)
+      .then((p) => {
+        if (!actif) return;
+        const paie = mapPaie(p);
+        setInfo((prev) => ({ ...prev, salaire: paie.net }));
+      })
+      .catch(() => {
+        /* repli neutre : salaire reste à 0 si le bulletin est indisponible */
+      });
+    return () => {
+      actif = false;
+    };
+  }, [e._id, e.id]);
 
   const [editOuvert, setEditOuvert] = useState(false);
   const [form, setForm] = useState(info);
