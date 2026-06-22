@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -8,41 +8,19 @@ import StatusPill from "../components/ui/StatusPill.jsx";
 import Modal from "../components/ui/Modal.jsx";
 import { Input, Select, Field } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes, fcfa } from "../data/datasets.js";
-import { paieDetail } from "../data/profil.js";
+import { apiGet } from "../lib/api.js";
+
+// Devise officielle de l'app : FCFA. Format « 1 300 FCFA » (repris de datasets.js, ce n'est pas une donnée).
+const fcfa = (n) => Math.round(n).toLocaleString("fr-FR") + " FCFA";
 
 const photoDe = (id) => `https://i.pravatar.cc/80?u=${encodeURIComponent(id)}`;
-const STATUT_SEED = { "AUR-7720": "En attente", "AUR-5567": "En attente", "AUR-2241": "En attente", "AUR-1190": "En retard" };
-const lignesPaie = employes.map((e) => ({ e, f: paieDetail(e.id) }));
 
 const AUJ_ISO = "2026-06-21";
 const AUJ = new Date(AUJ_ISO + "T00:00:00");
 const isoMoins = (n) => { const d = new Date(AUJ); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const PERIODE_API = AUJ_ISO.slice(0, 7); // "YYYY-MM" interrogé côté API
 
-const DEPENSES_SEED = [
-  { id: "DEP-01", date: "2026-06-18", libelle: "Loyer des bureaux — juin", categorie: "Loyer", montant: 850000 },
-  { id: "DEP-02", date: "2026-06-16", libelle: "Électricité & eau", categorie: "Charges", montant: 145000 },
-  { id: "DEP-03", date: "2026-06-12", libelle: "Abonnement Internet fibre", categorie: "Charges", montant: 60000 },
-  { id: "DEP-04", date: "2026-06-09", libelle: "Fournitures de bureau", categorie: "Fournitures", montant: 78000 },
-  { id: "DEP-05", date: "2026-06-04", libelle: "Carburant véhicules", categorie: "Transport", montant: 120000 },
-  { id: "DEP-06", date: "2026-05-28", libelle: "Maintenance pointeuses", categorie: "Maintenance", montant: 95000 },
-];
 const CATEGORIES_DEP = ["Loyer", "Charges", "Fournitures", "Transport", "Maintenance", "Autre"];
-
-// Mouvements du mois précédent (mai) — base de comparaison période précédente.
-const MOUVEMENTS_PREV = [
-  ...lignesPaie.filter((l) => !STATUT_SEED[l.e.id]).map((l, i) => ({ id: `SALM-${l.e.id}`, date: `2026-05-2${(i % 3) + 5}`, type: "Salaire", libelle: l.e.name, employeId: l.e.id, montant: Math.round(l.f.net * 0.94) })),
-  ...lignesPaie.filter((l) => l.f.avances > 0).map((l, i) => ({ id: `AVAM-${l.e.id}`, date: `2026-05-1${i % 9}`, type: "Avance", libelle: l.e.name, employeId: l.e.id, montant: Math.round(l.f.avances * 1.2) })),
-  { id: "DEPM-1", date: "2026-05-18", type: "Dépense", libelle: "Loyer des bureaux — mai", categorie: "Loyer", montant: 850000 },
-  { id: "DEPM-2", date: "2026-05-14", type: "Dépense", libelle: "Électricité & eau — mai", categorie: "Charges", montant: 130000 },
-];
-
-const MOUVEMENTS_BASE = [
-  ...lignesPaie.filter((l) => !STATUT_SEED[l.e.id]).map((l, i) => ({ id: `SAL-${l.e.id}`, date: isoMoins(2 + (i % 6)), type: "Salaire", libelle: l.e.name, employeId: l.e.id, montant: l.f.net })),
-  ...lignesPaie.filter((l) => l.f.avances > 0).map((l, i) => ({ id: `AVA-${l.e.id}`, date: isoMoins(5 + (i % 10)), type: "Avance", libelle: l.e.name, employeId: l.e.id, montant: l.f.avances })),
-  ...DEPENSES_SEED.map((d) => ({ id: d.id, date: d.date, type: "Dépense", libelle: d.libelle, categorie: d.categorie, montant: d.montant })),
-  ...MOUVEMENTS_PREV,
-];
 
 const PERIODES = [
   { key: "Semaine", label: "Semaine", min: isoMoins(7), prevMin: isoMoins(14) },
@@ -56,6 +34,48 @@ const META_TYPE = {
 };
 const COLS = "items-center gap-3 grid-cols-[2rem_minmax(0,1fr)_8rem] sm:grid-cols-[2rem_minmax(0,1fr)_7rem_8rem_6rem_5rem]";
 const focusable = "focus-visible:outline-none focus-visible:shadow-focus";
+
+// ---------------------------------------------------------------------------
+// MAPPING API -> forme attendue par le JSX (champs identiques aux anciens mocks).
+// ---------------------------------------------------------------------------
+
+// Statut de paie API -> libellé attendu par le JSX (StatusPill + workflow de paiement).
+// L'API /api/paie n'expose pas d'état « payé » par employé : on part de « En attente »
+// (neutre) pour laisser le workflow de paiement fonctionner ; « En retard » si la paie
+// n'est pas calculable côté API.
+function statutPaie(p) {
+  if (p && p.paie_calculable === false) return "En retard";
+  return "En attente";
+}
+
+// Une ligne de /api/paie -> { e:{id,name,fonction}, f:{base,primes,avances,retenues,net,status} }.
+// `fonction`/poste n'est pas renvoyé par /api/paie -> valeur neutre "" (rien ne casse).
+function mapLignePaie(p) {
+  const emp = p.employe || {};
+  const id = emp.matricule ?? String(emp.id ?? "");
+  const name = (`${emp.prenom ?? ""} ${emp.nom ?? ""}`).trim() || emp.matricule || "—";
+  const f = {
+    base: Number(p.salaire_brut) || 0,
+    primes: Number(p.primes) || 0,
+    avances: Number(p.avances) || 0,
+    retenues: Number(p.retenues) || 0,
+    net: Number(p.salaire_net) || 0,
+    status: statutPaie(p),
+  };
+  return { e: { id, name, fonction: "" }, f };
+}
+
+// Une dépense de /api/depenses -> mouvement « Dépense » attendu par MvtRow.
+function mapDepenseMvt(d) {
+  return {
+    id: `DEP-${d.id}`,
+    date: String(d.date).slice(0, 10),
+    type: "Dépense",
+    libelle: d.libelle,
+    categorie: d.categorie,
+    montant: Number(d.montant) || 0,
+  };
+}
 
 function fmtDate(iso) {
   const d = new Date(iso + "T00:00:00");
@@ -80,7 +100,15 @@ function MvtRow({ m }) {
 export default function Finance() {
   const { confirm, toast } = useUI();
   const [periode, setPeriode] = useState("Mois");
-  const [statuts, setStatuts] = useState(() => Object.fromEntries(employes.map((e) => [e.id, STATUT_SEED[e.id] ?? "Payé"])));
+
+  // --- Données réelles de l'API (remplacent les mocks de src/data) ---
+  const [lignesPaie, setLignesPaie] = useState([]);
+  const [mouvementsBase, setMouvementsBase] = useState([]);
+  const [synthese, setSynthese] = useState(null); // { total_courant, total_precedent, delta }
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  const [statuts, setStatuts] = useState({});
   const [annulables, setAnnulables] = useState({});
   const [ajouts, setAjouts] = useState([]);
   const [selection, setSelection] = useState(() => new Set());
@@ -94,8 +122,41 @@ export default function Finance() {
   const [dMontant, setDMontant] = useState("");
   const [dDate, setDDate] = useState(AUJ_ISO);
 
+  useEffect(() => {
+    setChargement(true);
+    setErreur(null);
+    Promise.all([
+      apiGet(`/api/paie?mois=${PERIODE_API}`),
+      apiGet(`/api/depenses?periode=${PERIODE_API}`),
+      apiGet(`/api/finance/synthese?periode=${PERIODE_API}`),
+    ])
+      .then(([paie, depenses, synth]) => {
+        const lignes = (paie?.paie ?? []).map(mapLignePaie);
+        setLignesPaie(lignes);
+        // Statut initial de paie par employé (workflow de paiement).
+        setStatuts(Object.fromEntries(lignes.map((l) => [l.e.id, l.f.status])));
+
+        // Mouvements du journal : dépenses société (réelles) + salaires/avances dérivés
+        // des bulletins de paie, datés dans le mois courant pour le filtre « Mois ».
+        const deps = (Array.isArray(depenses) ? depenses : []).map(mapDepenseMvt);
+        const salaires = lignes.map((l, i) => ({
+          id: `SAL-${l.e.id}`, date: isoMoins(2 + (i % 6)), type: "Salaire",
+          libelle: l.e.name, employeId: l.e.id, montant: l.f.net,
+        }));
+        const avances = lignes.filter((l) => l.f.avances > 0).map((l, i) => ({
+          id: `AVA-${l.e.id}`, date: isoMoins(5 + (i % 10)), type: "Avance",
+          libelle: l.e.name, employeId: l.e.id, montant: l.f.avances,
+        }));
+        setMouvementsBase([...salaires, ...avances, ...deps]);
+
+        setSynthese(synth ?? null);
+      })
+      .catch((err) => setErreur(err?.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
+
   const minPeriode = PERIODES.find((p) => p.key === periode).min;
-  const mvtsPeriode = useMemo(() => [...MOUVEMENTS_BASE, ...ajouts].filter((m) => m.date >= minPeriode).sort((a, b) => (a.date < b.date ? 1 : -1)), [ajouts, minPeriode]);
+  const mvtsPeriode = useMemo(() => [...mouvementsBase, ...ajouts].filter((m) => m.date >= minPeriode).sort((a, b) => (a.date < b.date ? 1 : -1)), [mouvementsBase, ajouts, minPeriode]);
   const totals = useMemo(() => {
     const par = (t) => mvtsPeriode.filter((m) => m.type === t).reduce((s, m) => s + m.montant, 0);
     const salaires = par("Salaire"), avances = par("Avance"), depenses = par("Dépense");
@@ -103,12 +164,16 @@ export default function Finance() {
   }, [mvtsPeriode]);
   const prevTotals = useMemo(() => {
     const cfg = PERIODES.find((p) => p.key === periode);
-    const prev = [...MOUVEMENTS_BASE, ...ajouts].filter((m) => m.date >= cfg.prevMin && m.date < cfg.min);
+    const prev = [...mouvementsBase, ...ajouts].filter((m) => m.date >= cfg.prevMin && m.date < cfg.min);
     const par = (t) => prev.filter((m) => m.type === t).reduce((s, m) => s + m.montant, 0);
     const salaires = par("Salaire"), avances = par("Avance"), depenses = par("Dépense");
     return { salaires, avances, depenses, total: salaires + avances + depenses };
-  }, [ajouts, periode]);
+  }, [mouvementsBase, ajouts, periode]);
   const deltaPct = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
+  // Delta global « Total dépensé » : fourni par /api/finance/synthese pour le mois courant.
+  const deltaTotal = periode === "Mois" && synthese && Number(synthese.total_precedent) > 0
+    ? Math.round(((Number(synthese.total_courant) - Number(synthese.total_precedent)) / Number(synthese.total_precedent)) * 100)
+    : deltaPct(totals.total, prevTotals.total);
 
   const nonPayes = lignesPaie.filter((l) => statuts[l.e.id] !== "Payé");
   const payes = lignesPaie.filter((l) => statuts[l.e.id] === "Payé");
@@ -120,7 +185,7 @@ export default function Finance() {
   const listePaie = useMemo(() => {
     const t = q.trim().toLowerCase();
     return lignesPaie.filter((l) => !t || l.e.name.toLowerCase().includes(t) || l.e.fonction.toLowerCase().includes(t));
-  }, [q]);
+  }, [q, lignesPaie]);
 
   const marquerPayes = (ids) => {
     if (!ids.length) return;
@@ -164,7 +229,7 @@ export default function Finance() {
   };
 
   const KPIS = [
-    { key: "total", label: "Total dépensé", montant: totals.total, delta: deltaPct(totals.total, prevTotals.total), icon: "account_balance_wallet", bg: "bg-or-100 text-or-700", tone: "or" },
+    { key: "total", label: "Total dépensé", montant: totals.total, delta: deltaTotal, icon: "account_balance_wallet", bg: "bg-or-100 text-or-700", tone: "or" },
     { key: "Salaire", label: "Salaires versés", montant: totals.salaires, delta: deltaPct(totals.salaires, prevTotals.salaires), icon: "payments", bg: "bg-sky-50 text-sky-600", tone: "sky" },
     { key: "Avance", label: "Avances", montant: totals.avances, delta: deltaPct(totals.avances, prevTotals.avances), icon: "savings", bg: "bg-amber-50 text-amber-600", tone: "amber" },
     { key: "Dépense", label: "Dépenses société", montant: totals.depenses, delta: deltaPct(totals.depenses, prevTotals.depenses), icon: "receipt_long", bg: "bg-rose-50 text-rose-600", tone: "rose" },
@@ -172,6 +237,24 @@ export default function Finance() {
   const libPrec = periode === "Année" ? "an précédent" : periode === "Semaine" ? "semaine préc." : "mois préc.";
   const detailKpi = detail ? KPIS.find((k) => k.key === detail) : null;
   const detailMvts = detail ? (detail === "total" ? mvtsPeriode : mvtsPeriode.filter((m) => m.type === detail)) : [];
+
+  if (chargement) {
+    return (
+      <div className="card py-16 text-center">
+        <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+        <p className="mt-2 text-sm text-muted">Chargement des finances…</p>
+      </div>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <div className="card py-16 text-center">
+        <Icon name="error" className="text-faint text-[40px]" />
+        <p className="mt-2 text-sm text-muted">{erreur}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 pb-12">

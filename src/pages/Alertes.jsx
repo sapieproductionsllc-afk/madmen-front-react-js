@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import StatTile from "../components/ui/StatTile.jsx";
@@ -8,13 +8,46 @@ import Icon from "../components/ui/Icon.jsx";
 import Drawer from "../components/ui/Drawer.jsx";
 import Avatar from "../components/ui/Avatar.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { alertes as donnees } from "../data/datasets.js";
+import { apiGet } from "../lib/api.js";
 
 const config = {
   Critique: { tone: "rose", icon: "gpp_bad", chip: "bg-rose-50 text-rose-700", bar: "bg-rose-500", rang: 0 },
   Moyen: { tone: "amber", icon: "warning", chip: "bg-amber-50 text-amber-700", bar: "bg-amber-500", rang: 1 },
   Faible: { tone: "slate", icon: "info", chip: "bg-slate-50 text-slate-700", bar: "bg-slate-500", rang: 2 },
 };
+
+// Normalise la sévérité de l'API vers les clés attendues par `config` (Critique/Moyen/Faible).
+function normSeverite(s) {
+  const v = String(s ?? "").toLowerCase();
+  if (v.startsWith("crit") || v === "haute" || v === "high" || v === "élevé" || v === "eleve") return "Critique";
+  if (v.startsWith("moy") || v === "medium" || v === "warning") return "Moyen";
+  return "Faible";
+}
+
+// Extrait un HH:MM affichable depuis l'horodatage API (ISO, "HH:MM:SS", timestamp…).
+function heure(h) {
+  if (!h) return "00:00";
+  const str = String(h);
+  // Cas ISO ou "YYYY-MM-DD HH:MM:SS" : on isole la partie heure.
+  const m = str.match(/(\d{2}):(\d{2})/);
+  if (m) return `${m[1]}:${m[2]}`;
+  return "00:00";
+}
+
+// Mapping API (GET /api/alertes) -> forme exacte attendue par le JSX (champs identiques au mock).
+function mapAlerte(a) {
+  return {
+    id: a.id,
+    type: a.type || "Alerte",
+    severity: normSeverite(a.severite),
+    employe: a.employe_nom || "Inconnu", // valeur neutre : préserve la logique « employé réel »
+    agence: a.agence || "—", // absent de l'API -> neutre (pas de champ agence renvoyé)
+    machine: a.machine || "—", // absent de l'API -> neutre (comme dans le mock)
+    time: heure(a.horodatage),
+    message: a.message || "",
+    read: Boolean(a.lu),
+  };
+}
 
 // Chronologie reconstituée (frontend / données mockées) autour de l'heure de l'alerte.
 function chronologie(a) {
@@ -35,8 +68,23 @@ function chronologie(a) {
 export default function Alertes() {
   const { toast } = useUI();
   const navigate = useNavigate();
-  const [lues, setLues] = useState(() => new Set(donnees.filter((a) => a.read).map((a) => a.id)));
+  const [donnees, setDonnees] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [lues, setLues] = useState(() => new Set());
   const [selected, setSelected] = useState(null);
+
+  // Données RÉELLES depuis l'API (remplace les mocks de src/data).
+  useEffect(() => {
+    apiGet("/api/alertes")
+      .then((data) => {
+        const liste = (Array.isArray(data) ? data : []).map(mapAlerte);
+        setDonnees(liste);
+        setLues(new Set(liste.filter((a) => a.read).map((a) => a.id)));
+      })
+      .catch((e) => setErreur(e.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
 
   const marquerLu = (a) => {
     setLues((s) => new Set(s).add(a.id));
@@ -76,89 +124,106 @@ export default function Alertes() {
         <StatTile icon="info" label="Faibles" value={compteur("Faible")} color="slate" />
       </div>
 
-      <div className="space-y-3">
-        {triees.map((a) => {
-          const c = config[a.severity] ?? config.Faible;
-          const lu = lues.has(a.id);
-          const critique = a.severity === "Critique" && !lu;
-          return (
-            <div
-              key={a.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSelected(a)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setSelected(a);
-                }
-              }}
-              aria-label={`Ouvrir le détail : ${a.type}`}
-              className={`group relative flex items-stretch overflow-hidden rounded-2xl border bg-surface cursor-pointer transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
-                lu
-                  ? "border-border opacity-55 hover:opacity-80"
-                  : critique
-                    ? "border-rose-500/30 hover:-translate-y-px hover:shadow-lift"
-                    : "border-border hover:border-border-strong hover:-translate-y-px hover:shadow-lift"
-              }`}
-            >
-              {/* Barre de sévérité */}
-              <span aria-hidden="true" className={`w-1.5 shrink-0 ${c.bar} ${lu ? "opacity-50" : ""}`} />
-              {/* Voile teinté pour les critiques non lues */}
-              {critique && <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-rose-500/[0.05]" />}
+      {chargement ? (
+        <div className="card py-16 text-center">
+          <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+          <p className="mt-2 text-sm text-muted">Chargement des alertes…</p>
+        </div>
+      ) : erreur ? (
+        <div className="card py-16 text-center">
+          <Icon name="error" className="text-rose-500 text-[40px]" />
+          <p className="mt-2 text-sm text-muted">{erreur}</p>
+        </div>
+      ) : triees.length === 0 ? (
+        <div className="card py-16 text-center">
+          <Icon name="notifications_off" className="text-faint text-[40px]" />
+          <p className="mt-2 text-sm text-muted">Aucune alerte à afficher.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {triees.map((a) => {
+            const c = config[a.severity] ?? config.Faible;
+            const lu = lues.has(a.id);
+            const critique = a.severity === "Critique" && !lu;
+            return (
+              <div
+                key={a.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelected(a)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelected(a);
+                  }
+                }}
+                aria-label={`Ouvrir le détail : ${a.type}`}
+                className={`group relative flex items-stretch overflow-hidden rounded-2xl border bg-surface cursor-pointer transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
+                  lu
+                    ? "border-border opacity-55 hover:opacity-80"
+                    : critique
+                      ? "border-rose-500/30 hover:-translate-y-px hover:shadow-lift"
+                      : "border-border hover:border-border-strong hover:-translate-y-px hover:shadow-lift"
+                }`}
+              >
+                {/* Barre de sévérité */}
+                <span aria-hidden="true" className={`w-1.5 shrink-0 ${c.bar} ${lu ? "opacity-50" : ""}`} />
+                {/* Voile teinté pour les critiques non lues */}
+                {critique && <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-rose-500/[0.05]" />}
 
-              <div className="relative flex flex-1 items-start gap-4 px-5 py-4 min-w-0">
-                <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${c.chip}`}>
-                  <Icon name={c.icon} className="text-[22px]" filled />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold text-ink truncate">{a.type}</span>
-                    <StatusPill label={a.severity} tone={c.tone} dot={false} />
-                    {!lu && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-600">Nouveau</span>
+                <div className="relative flex flex-1 items-start gap-4 px-5 py-4 min-w-0">
+                  <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${c.chip}`}>
+                    <Icon name={c.icon} className="text-[22px]" filled />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-ink truncate">{a.type}</span>
+                      <StatusPill label={a.severity} tone={c.tone} dot={false} />
+                      {!lu && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-600">Nouveau</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-texte">{a.message}</p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5 text-xs text-muted">
+                      <span className="flex items-center gap-1.5"><Icon name="person" className="text-[14px]" />{a.employe}</span>
+                      <span className="flex items-center gap-1.5"><Icon name="apartment" className="text-[14px]" />{a.agence}</span>
+                      <span className="flex items-center gap-1.5"><Icon name="dvr" className="text-[14px]" />{a.machine}</span>
+                    </div>
+                  </div>
+                  {/* Colonne droite : horodatage + action */}
+                  <div className="flex flex-col items-end gap-3 shrink-0">
+                    <span className="flex items-center gap-1 text-xs text-muted whitespace-nowrap">
+                      <Icon name="schedule" className="text-[14px]" />{a.time}
+                    </span>
+                    {!lu ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon="check"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          marquerLu(a);
+                        }}
+                      >
+                        Marquer lu
+                      </Button>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-subtle whitespace-nowrap">
+                        <Icon name="check_circle" className="text-[14px]" />Lu
+                      </span>
                     )}
                   </div>
-                  <p className="text-sm text-texte">{a.message}</p>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5 text-xs text-muted">
-                    <span className="flex items-center gap-1.5"><Icon name="person" className="text-[14px]" />{a.employe}</span>
-                    <span className="flex items-center gap-1.5"><Icon name="apartment" className="text-[14px]" />{a.agence}</span>
-                    <span className="flex items-center gap-1.5"><Icon name="dvr" className="text-[14px]" />{a.machine}</span>
-                  </div>
+                  {/* Indicateur d'ouverture du détail */}
+                  <Icon
+                    name="chevron_right"
+                    className="self-center shrink-0 text-faint group-hover:text-muted transition-colors"
+                  />
                 </div>
-                {/* Colonne droite : horodatage + action */}
-                <div className="flex flex-col items-end gap-3 shrink-0">
-                  <span className="flex items-center gap-1 text-xs text-muted whitespace-nowrap">
-                    <Icon name="schedule" className="text-[14px]" />{a.time}
-                  </span>
-                  {!lu ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon="check"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        marquerLu(a);
-                      }}
-                    >
-                      Marquer lu
-                    </Button>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-subtle whitespace-nowrap">
-                      <Icon name="check_circle" className="text-[14px]" />Lu
-                    </span>
-                  )}
-                </div>
-                {/* Indicateur d'ouverture du détail */}
-                <Icon
-                  name="chevron_right"
-                  className="self-center shrink-0 text-faint group-hover:text-muted transition-colors"
-                />
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Panneau de détail */}
       <Drawer

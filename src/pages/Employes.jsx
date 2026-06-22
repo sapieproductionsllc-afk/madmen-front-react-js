@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
 import { FilterSelect } from "../components/ui/Input.jsx";
@@ -6,16 +6,34 @@ import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import CarteAnnuaire from "../components/ui/CarteAnnuaire.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes } from "../data/datasets.js";
-
-const services = ["Tous services", ...Array.from(new Set(employes.map((e) => e.department)))];
-const statuts = ["Tous statuts", ...Array.from(new Set(employes.map((e) => e.status)))];
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
 
 export default function Employes() {
   const { openAddEmployee } = useUI();
+  const [employes, setEmployes] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
   const [q, setQ] = useState("");
   const [service, setService] = useState("Tous services");
   const [statut, setStatut] = useState("Tous statuts");
+
+  // Données RÉELLES depuis l'API (remplace les mocks de src/data).
+  useEffect(() => {
+    apiGet("/api/employes")
+      .then((data) => setEmployes((Array.isArray(data) ? data : []).map(mapEmploye)))
+      .catch((e) => setErreur(e.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
+
+  const services = useMemo(
+    () => ["Tous services", ...Array.from(new Set(employes.map((e) => e.department)))],
+    [employes]
+  );
+  const statuts = useMemo(
+    () => ["Tous statuts", ...Array.from(new Set(employes.map((e) => e.status)))],
+    [employes]
+  );
 
   const liste = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -25,7 +43,7 @@ export default function Employes() {
       const okStat = statut === "Tous statuts" || e.status === statut;
       return okQ && okS && okStat;
     });
-  }, [q, service, statut]);
+  }, [q, service, statut, employes]);
 
   const filtreCls = "h-11 rounded-xl bg-surface border border-border text-muted pl-3.5 shadow-soft focus:border-or-500 focus:ring-2 focus:ring-or-500/15";
 
@@ -53,7 +71,17 @@ export default function Employes() {
       </div>
 
       {/* Grille annuaire */}
-      {liste.length === 0 ? (
+      {chargement ? (
+        <div className="card py-16 text-center">
+          <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+          <p className="mt-2 text-sm text-muted">Chargement des agents…</p>
+        </div>
+      ) : erreur ? (
+        <div className="card py-16 text-center">
+          <Icon name="error" className="text-rose-500 text-[40px]" />
+          <p className="mt-2 text-sm text-muted">{erreur}</p>
+        </div>
+      ) : liste.length === 0 ? (
         <div className="card py-16 text-center">
           <Icon name="search_off" className="text-faint text-[40px]" />
           <p className="mt-2 text-sm text-muted">Aucun agent ne correspond.</p>

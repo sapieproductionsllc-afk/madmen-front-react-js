@@ -5,7 +5,8 @@ import Button from "../components/ui/Button.jsx";
 import Avatar from "../components/ui/Avatar.jsx";
 import { FilterSelect } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes, tempsReel } from "../data/datasets.js";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/160?u=${encodeURIComponent(id)}`;
 const STATUTS = ["Présent", "Retard", "Absent", "Congé"];
@@ -14,40 +15,30 @@ const PCT_INIT = { Présent: 100, Retard: 90, Absent: 0, Congé: 0 };
 const MOIS_AB = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const MOIS_LONG = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 const PERIODES = ["Jour", "Semaine", "Mois", "Année"];
-const FIN = "2026-06-19"; // dernier jour ouvré de référence
-const MOIS_COURANT = 5; // juin
+const MOIS_COURANT = new Date().getMonth(); // mois de référence pour le filtre « Mois »
 const champTime =
   "w-[5rem] rounded-lg bg-canvas border border-border px-2 py-1 text-sm font-mono tabular-nums text-texte outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15";
 
-function makeRng(id) {
-  let s = 7;
-  for (const c of id) s = (s * 31 + c.charCodeAt(0)) >>> 0;
-  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
-}
-const hm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+// Statut API (enum) -> libellé attendu par le JSX.
+const STATUT_API = { present: "Présent", retard: "Retard", absent: "Absent", conge: "Congé" };
+// DATETIME 'YYYY-MM-DD HH:MM:SS' -> 'HH:MM' ; '--:--' si absent.
+const heure = (dt) => (dt ? String(dt).slice(11, 16) : "--:--");
+// minutes -> 'Xh MM' ; '—' si rien.
+const dureeHm = (min) => (min && min > 0 ? `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}` : "—");
 
-// Génère les jours ouvrés de l'année (1er janv. → FIN), déterministe par agent.
-function genAnnee(id) {
-  const r = makeRng(id);
-  const fin = new Date(FIN + "T00:00:00");
-  const jours = [];
-  for (let d = new Date("2026-01-01T00:00:00"); d <= fin; d.setDate(d.getDate() + 1)) {
-    const dow = d.getDay();
-    if (dow === 0 || dow === 6) continue;
-    const x = r();
-    const statut = x < 0.8 ? "Présent" : x < 0.9 ? "Retard" : x < 0.96 ? "Congé" : "Absent";
-    let arrivee = "--:--", depart = "--:--", temps = "—";
-    if (statut === "Présent" || statut === "Retard") {
-      const arr = statut === "Retard" ? 8 * 60 + 16 + Math.floor(r() * 34) : 8 * 60 + Math.floor(r() * 14) - 6;
-      const dep = 17 * 60 + 24 + Math.floor(r() * 42);
-      arrivee = hm(arr);
-      depart = hm(dep);
-      const t = dep - arr - 60;
-      temps = `${Math.floor(t / 60)}h ${String(t % 60).padStart(2, "0")}`;
-    }
-    jours.push({ mois: d.getMonth(), date: `${d.getDate()} ${MOIS_AB[d.getMonth()]}`, arrivee, depart, temps, statut, pourcentage: PCT_INIT[statut] ?? 100 });
-  }
-  return jours;
+// Pointage API -> ligne attendue par le JSX (mêmes champs que le mock).
+function mapPointage(p) {
+  const statut = STATUT_API[p.statut] || "Absent";
+  const d = p.date ? new Date(p.date + "T00:00:00") : null;
+  return {
+    mois: d ? d.getMonth() : MOIS_COURANT,
+    date: d ? `${d.getDate()} ${MOIS_AB[d.getMonth()]}` : "—",
+    arrivee: heure(p.heure_entree),
+    depart: heure(p.heure_sortie),
+    temps: dureeHm(p.temps_present_minutes),
+    statut,
+    pourcentage: PCT_INIT[statut] ?? 100,
+  };
 }
 
 const tranche = (p, tous) =>
@@ -58,9 +49,37 @@ export default function Pointages() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useUI();
-  const e = employes.find((x) => x.id === id);
 
-  const tous = useMemo(() => (e ? genAnnee(id) : []), [id, e]);
+  const [e, setE] = useState(null);
+  const [tous, setTous] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  useEffect(() => {
+    setChargement(true);
+    setErreur(null);
+    apiGet("/api/pointages")
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : [];
+        // L'agent est identifié par son matricule OU son id numérique dans l'URL.
+        const sien = rows.filter((p) => String(p.employe_id) === String(id) || String(p.matricule) === String(id));
+        const base = sien[0] || {};
+        // En-tête agent via mapEmploye (champs absents -> valeurs neutres, rien ne casse).
+        setE(mapEmploye({
+          matricule: base.matricule ?? id,
+          id: base.employe_id ?? null,
+          name: base.name ?? "",
+          poste_libelle: base.poste_libelle ?? "",
+          departement_nom: base.departement_nom ?? "",
+          statut: base.statut_employe ?? null,
+          today: base,
+        }));
+        setTous(sien.map(mapPointage));
+      })
+      .catch((err) => setErreur(err.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, [id]);
+
   const annee = useMemo(() => {
     const parMois = {};
     tous.forEach((j) => { (parMois[j.mois] ||= []).push(j); });
@@ -79,6 +98,27 @@ export default function Pointages() {
   const [periode, setPeriode] = useState("Semaine");
   const [rows, setRows] = useState([]);
   useEffect(() => { if (periode !== "Année") setRows(tranche(periode, tous)); }, [periode, tous]);
+
+  if (chargement) {
+    return (
+      <div className="card py-16 text-center max-w-lg mx-auto">
+        <Icon name="progress_activity" className="text-brand-600 text-[40px] animate-spin" />
+        <p className="mt-2 text-sm text-muted">Chargement des pointages…</p>
+      </div>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <div className="card py-16 text-center max-w-lg mx-auto">
+        <Icon name="error" className="text-rose-500 text-[40px]" />
+        <p className="mt-2 text-sm text-muted">{erreur}</p>
+        <button onClick={() => navigate("/")} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700">
+          <Icon name="arrow_back" className="text-[18px]" /> Retour au tableau de bord
+        </button>
+      </div>
+    );
+  }
 
   if (!e) {
     return (

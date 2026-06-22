@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -9,6 +9,8 @@ import Modal from "../components/ui/Modal.jsx";
 import { Input, Field } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/160?u=${encodeURIComponent(id)}`;
 
@@ -18,6 +20,24 @@ const CONNEXIONS = [
   { id: 2, appareil: "Safari · iPhone", lieu: "Brazzaville, CG", date: "Hier · 19:14" },
   { id: 3, appareil: "Chrome · Windows", lieu: "Pointe-Noire, CG", date: "18 juin · 09:02" },
 ];
+
+// Profil API (/api/me/profil) -> forme attendue par le JSX de la page.
+// On réutilise mapEmploye pour l'identité (name/email/role/matricule), puis on
+// complète avec les champs propres au profil (telephone, manager, département).
+function mapProfil(p) {
+  const e = mapEmploye(p);
+  return {
+    id: e.matricule || p.matricule || "",
+    matricule: e.matricule || p.matricule || "—",
+    name: e.name || "",
+    email: e.email || "",
+    telephone: p.telephone || e.phone || "", // l'API expose `telephone` en clair
+    role: e.role || p.role || "Administrateur",
+    fonction: p.poste || e.fonction || "—", // l'API expose `poste`
+    department: p.departement || e.department || "—", // l'API expose `departement`
+    manager: p.manager || "", // non utilisé par le design actuel — conservé au cas où
+  };
+}
 
 function Toggle({ checked, onChange, label }) {
   return (
@@ -55,10 +75,15 @@ export default function MonProfil() {
   const navigate = useNavigate();
   const { toast, confirm } = useUI();
 
+  // Données RÉELLES du profil de l'employé connecté (remplace les valeurs mock).
+  const [profil, setProfil] = useState(null);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
   const base = {
-    name: user?.name || "Administrateur",
-    email: user?.email || "admin@madmen.io",
-    telephone: user?.telephone || "+242 06 12 34 56",
+    name: profil?.name || "",
+    email: profil?.email || "",
+    telephone: profil?.telephone || "",
   };
   const [form, setForm] = useState(base);
   const [photo, setPhoto] = useState(null);
@@ -66,6 +91,17 @@ export default function MonProfil() {
   const [twoFA, setTwoFA] = useState(true);
   const [mdpOuvert, setMdpOuvert] = useState(false);
   const [mdp, setMdp] = useState({ actuel: "", nouveau: "", confirme: "" });
+
+  useEffect(() => {
+    apiGet("/api/me/profil")
+      .then((data) => {
+        const p = mapProfil(data || {});
+        setProfil(p);
+        setForm({ name: p.name, email: p.email, telephone: p.telephone });
+      })
+      .catch((e) => setErreur(e.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
 
   const choisirPhoto = (e) => {
     const f = e.target.files?.[0];
@@ -77,8 +113,8 @@ export default function MonProfil() {
     e.target.value = "";
   };
 
-  const matricule = user?.matricule || "—";
-  const role = user?.role || "Administrateur";
+  const matricule = profil?.matricule || "—";
+  const role = profil?.role || "Administrateur";
   const dirty = form.name !== base.name || form.email !== base.email || form.telephone !== base.telephone;
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -87,6 +123,7 @@ export default function MonProfil() {
     if (!form.name.trim() || !email) return toast("Nom et e-mail requis", "error");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast("Adresse e-mail invalide", "error");
     login({ ...user, name: form.name.trim(), email, telephone: form.telephone.trim() });
+    setProfil((p) => ({ ...p, name: form.name.trim(), email, telephone: form.telephone.trim() }));
     toast("Profil mis à jour", "success");
   };
   const fermerMdp = () => { setMdpOuvert(false); setMdp({ actuel: "", nouveau: "", confirme: "" }); };
@@ -102,6 +139,18 @@ export default function MonProfil() {
     <div className="space-y-5 pb-12">
       <PageHeader title="Mon profil" subtitle="Vos informations personnelles et votre compte." />
 
+      {chargement ? (
+        <div className="card py-12 text-center">
+          <Icon name="progress_activity" className="text-faint text-[36px] animate-spin" />
+          <p className="mt-2 text-sm text-muted">Chargement de votre profil…</p>
+        </div>
+      ) : erreur ? (
+        <div className="card py-12 text-center">
+          <Icon name="error" className="text-rose-500 text-[36px]" />
+          <p className="mt-2 text-sm text-muted">{erreur}</p>
+        </div>
+      ) : (
+      <>
       {/* Hero */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-700 to-brand-600 p-5 sm:p-6 shadow-card flex items-center gap-4 flex-wrap">
         <span className="absolute -right-10 -top-12 w-44 h-44 rounded-full bg-white/5" aria-hidden="true" />
@@ -221,6 +270,8 @@ export default function MonProfil() {
           </div>
         </Carte>
       </div>
+      </>
+      )}
 
       {/* Modale changement de mot de passe */}
       <Modal

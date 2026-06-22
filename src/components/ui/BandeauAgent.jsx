@@ -108,7 +108,7 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
 
         {/* Actions */}
         <div className="flex items-center justify-center gap-2 shrink-0">
-          <button onClick={onPaiements} className={`inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-or-500 text-ink hover:bg-or-400 transition-colors ${focusOr}`}>
+          <button onClick={onPaiements} className={`inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-or-500 text-white hover:bg-or-400 transition-colors ${focusOr}`}>
             <Icon name="payments" className="text-[18px]" filled /> Paiements
           </button>
           <button onClick={() => toast(`Message à ${info.name}`, "info")} aria-label="Message" title="Message" className={`w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-colors ${focusOr}`}>

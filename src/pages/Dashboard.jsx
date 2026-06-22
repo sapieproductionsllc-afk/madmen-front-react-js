@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
@@ -7,7 +7,40 @@ import CarteAgent from "../components/ui/CarteAgent.jsx";
 import Avatar from "../components/ui/Avatar.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import Table from "../components/ui/Table.jsx";
-import { employes, tempsReel, ordreLive, toneLive, paie } from "../data/datasets.js";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
+
+// Constantes de design (reprises des anciens mocks `datasets.js`, ce ne sont pas des données) :
+// statut live -> tonalité de badge, et ordre d'affichage des statuts.
+const toneLive = { "En activité": "emerald", "En pause": "amber", Absent: "rose", Congé: "sky" };
+const ordreLive = { "En activité": 0, "En pause": 1, Absent: 2, Congé: 3 };
+
+// API statut (present/retard/absent/conge) -> statut live attendu par le JSX.
+// L'API n'expose pas de notion de « pause » : aucun agent ne tombera dans "En pause".
+const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé" };
+
+// Construit l'employé (forme attendue par le JSX / CarteAgent) + son temps réel
+// à partir d'un agent renvoyé par /api/dashboard/presence (agents[]).
+// On réutilise mapEmploye en remettant l'agent à la forme qu'il attend (`today`).
+function mapAgentDashboard(a) {
+  const e = mapEmploye({
+    id: a.id,
+    matricule: a.matricule,
+    name: a.name,
+    departement_nom: a.departement_nom,
+    poste_libelle: a.poste_libelle,
+    statut: a.statut === "conge" ? "conge" : "actif",
+    today: { statut: a.statut, arrivee: a.arrivee, retard_minutes: a.retard_minutes },
+  });
+  const live = STATUT_LIVE[a.statut] ?? "Absent";
+  return {
+    ...e,
+    // `tr` consommé par CarteAgent : { live, detail, depuis }
+    tr: { live, detail: e.fonction || "", depuis: "—" },
+  };
+}
+
+const statuts = ["Tous les statuts", "En activité", "En pause", "Absent", "Congé"];
 
 const tonesPastille = {
   brand: "bg-brand-50 text-brand-600",
@@ -23,9 +56,6 @@ const tonesBord = {
   rose: "border-t-rose-500",
   sky: "border-t-sky-500",
 };
-
-const services = ["Tous les services", ...Array.from(new Set(employes.map((e) => e.department)))];
-const statuts = ["Tous les statuts", "En activité", "En pause", "Absent", "Congé"];
 
 function KPI({ value, label, sub, icon, tone }) {
   return (
@@ -50,6 +80,28 @@ export default function Dashboard() {
   const [vue, setVue] = useState("grille");
   const [tri, setTri] = useState("arrivee");
 
+  const [employes, setEmployes] = useState([]);
+  const [paie, setPaie] = useState([]); // pas exposé par ces endpoints -> neutre []
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  useEffect(() => {
+    setChargement(true);
+    setErreur(null);
+    // Présence (compteurs + agents[]) + productivité globale (KPI productivité).
+    Promise.all([apiGet("/api/dashboard/presence"), apiGet("/api/productivite/global")])
+      .then(([presence]) => {
+        setEmployes((presence?.agents ?? []).map(mapAgentDashboard));
+      })
+      .catch((e) => setErreur(e?.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
+
+  // Index temps réel { matricule -> { live, detail, depuis } } (consommé par les cartes).
+  const tempsReel = useMemo(() => Object.fromEntries(employes.map((e) => [e.id, e.tr])), [employes]);
+
+  const services = useMemo(() => ["Tous les services", ...Array.from(new Set(employes.map((e) => e.department)))], [employes]);
+
   const liveDe = (e) => tempsReel[e.id]?.live ?? "Absent";
   const compte = (k) => employes.filter((e) => liveDe(e) === k).length;
   const presents = compte("En activité") + compte("En pause");
@@ -57,7 +109,7 @@ export default function Dashboard() {
 
   const kpis = [
     { value: employes.length, label: "Total agents", sub: "Tous les services", icon: "groups", tone: "brand" },
-    { value: presents, label: "Présents", sub: `${Math.round((presents / employes.length) * 100)} % de l'effectif`, icon: "check_circle", tone: "emerald" },
+    { value: presents, label: "Présents", sub: `${employes.length ? Math.round((presents / employes.length) * 100) : 0} % de l'effectif`, icon: "check_circle", tone: "emerald" },
     { value: compte("En pause"), label: "En pause", sub: "Pause café / déjeuner", icon: "pause_circle", tone: "amber" },
     { value: compte("Absent"), label: "Absents", sub: "À justifier", icon: "person_off", tone: "rose" },
     { value: compte("Congé"), label: "En congé", sub: "Congé approuvé", icon: "flight", tone: "sky" },
@@ -82,7 +134,7 @@ export default function Dashboard() {
       return va.localeCompare(vb);
     });
     return arr;
-  }, [q, service, statut, tri]);
+  }, [q, service, statut, tri, employes, tempsReel]);
 
   const filtreCls = "h-9 rounded-lg bg-surface border border-border-strong text-texte pl-2.5 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15";
 
@@ -165,7 +217,17 @@ export default function Dashboard() {
       </div>
 
       {/* Grille ou liste — pleine largeur */}
-      {liste.length === 0 ? (
+      {chargement ? (
+        <div className="card py-16 text-center">
+          <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+          <p className="mt-2 text-sm text-muted">Chargement des agents…</p>
+        </div>
+      ) : erreur ? (
+        <div className="card py-16 text-center">
+          <Icon name="error" className="text-faint text-[40px]" />
+          <p className="mt-2 text-sm text-muted">{erreur}</p>
+        </div>
+      ) : liste.length === 0 ? (
         <div className="card py-16 text-center">
           <Icon name="search_off" className="text-faint text-[40px]" />
           <p className="mt-2 text-sm text-muted">Aucun agent ne correspond.</p>

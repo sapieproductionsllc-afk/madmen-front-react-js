@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -7,11 +7,46 @@ import StatusPill from "../components/ui/StatusPill.jsx";
 import BandeauAgent from "../components/ui/BandeauAgent.jsx";
 import { Input, Field } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes, tempsReel, fcfa } from "../data/datasets.js";
-import { paieDetail, historiquePaiements } from "../data/profil.js";
+import { fcfa } from "../data/datasets.js";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
 
 const champMontant =
   "w-36 rounded-lg bg-canvas border border-border px-3 py-1.5 text-sm text-right font-mono tabular-nums text-texte outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15";
+
+// "YYYY-MM" -> "Juin 2026" (libellé de mois affiché dans le JSX). Repli : valeur brute.
+const MOIS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+function moisLabel(mois) {
+  if (typeof mois !== "string") return "";
+  const [a, m] = mois.split("-");
+  const i = Number(m) - 1;
+  return MOIS_FR[i] ? `${MOIS_FR[i]} ${a}` : mois;
+}
+
+// Bulletin de paie API -> forme attendue par le JSX (identique à l'ancien `paieDetail`).
+// L'API renvoie déjà des montants en devise réelle (pas de conversion).
+function mapPaie(bulletin) {
+  if (!bulletin) return { base: 0, primes: 0, retenues: 0, avances: 0, net: 0, status: "En attente", moisLabel: "" };
+  const base = Number(bulletin.salaire_brut) || 0;
+  const primes = Number(bulletin.primes) || 0;
+  // Retenues affichées = retenues manuelles + déductions automatiques (retard + absence).
+  const retenues =
+    (Number(bulletin.retenues) || 0) +
+    (Number(bulletin.deduction_retard) || 0) +
+    (Number(bulletin.deduction_absence) || 0);
+  const avances = Number(bulletin.avances) || 0;
+  // L'API /api/paie n'expose pas de statut « payé » ici -> valeur neutre par défaut.
+  const status = bulletin.status === "Payé" ? "Payé" : "En attente";
+  return {
+    base,
+    primes,
+    retenues,
+    avances,
+    net: Number(bulletin.salaire_net) || 0,
+    status,
+    moisLabel: moisLabel(bulletin.mois),
+  };
+}
 
 function CardHeader({ icon, title }) {
   return (
@@ -29,14 +64,95 @@ export default function Paiement() {
   const navigate = useNavigate();
   const { toast } = useUI();
 
-  const e = employes.find((x) => x.id === id);
-  const base = paieDetail(id);
+  // Données RÉELLES depuis l'API (remplacent les mocks de src/data).
+  const [e, setE] = useState(null);
+  const [base, setBase] = useState(null);
+  const [paiements, setPaiements] = useState([]);
+  const [live, setLive] = useState("Absent"); // l'API /api/paie n'expose pas de statut temps réel
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
 
   // Composition du salaire (modifiable) + avances en cours (dette) + statut.
-  const [compo, setCompo] = useState({ base: base?.base ?? 0, primes: base?.primes ?? 0, retenues: base?.retenues ?? 0 });
-  const [avances, setAvances] = useState(base?.avances ?? 0);
-  const [statut, setStatut] = useState(base?.status === "Payé" ? "Payé" : "En attente");
+  const [compo, setCompo] = useState({ base: 0, primes: 0, retenues: 0 });
+  const [avances, setAvances] = useState(0);
+  const [statut, setStatut] = useState("En attente");
   const [mouvement, setMouvement] = useState("");
+
+  useEffect(() => {
+    let actif = true;
+    setChargement(true);
+    setErreur(null);
+
+    Promise.all([
+      apiGet("/api/employes"),
+      apiGet("/api/paie"),
+      apiGet("/api/prets").catch(() => null), // avances : optionnel si l'endpoint est absent
+    ])
+      .then(([employesData, paieData, pretsData]) => {
+        if (!actif) return;
+
+        const agentApi = (Array.isArray(employesData) ? employesData : []).find((x) => x.matricule === id);
+        const agent = agentApi ? mapEmploye(agentApi) : null;
+
+        const liste = Array.isArray(paieData?.paie) ? paieData.paie : [];
+        const bulletin = liste.find((b) => b?.employe?.matricule === id) || null;
+        const paie = mapPaie(bulletin);
+
+        // Avances = somme des mensualités des prêts en cours de l'employé (repli : bulletin).
+        let totalAvances = paie.avances;
+        if (Array.isArray(pretsData) && agentApi) {
+          const empId = agentApi.id;
+          const somme = pretsData
+            .filter((p) => p && p.employe_id === empId && p.statut === "en_cours")
+            .reduce((s, p) => s + (Number(p.mensualite) || 0), 0);
+          if (pretsData.some((p) => p && p.employe_id === empId)) totalAvances = somme;
+        }
+
+        // Historique des paiements : l'API n'expose pas l'historique multi-mois ici,
+        // on présente le bulletin du mois courant (vide si pas de paie).
+        const histo = bulletin
+          ? [{ mois: paie.moisLabel || "Mois en cours", net: paie.net, status: paie.status }]
+          : [];
+
+        setE(agent);
+        setBase(paie);
+        setPaiements(histo);
+        setCompo({ base: paie.base, primes: paie.primes, retenues: paie.retenues });
+        setAvances(totalAvances);
+        setStatut(paie.status === "Payé" ? "Payé" : "En attente");
+      })
+      .catch((err) => {
+        if (actif) setErreur(err?.message || "Erreur de chargement");
+      })
+      .finally(() => {
+        if (actif) setChargement(false);
+      });
+
+    return () => {
+      actif = false;
+    };
+  }, [id]);
+
+  if (chargement) {
+    return (
+      <div className="card py-16 text-center max-w-lg mx-auto">
+        <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+        <p className="mt-2 text-sm text-muted">Chargement de la paie…</p>
+      </div>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <div className="card py-16 text-center max-w-lg mx-auto">
+        <Icon name="error" className="text-rose-500 text-[40px]" />
+        <p className="mt-2 text-sm text-muted">{erreur}</p>
+        <button onClick={() => navigate("/")} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700">
+          <Icon name="arrow_back" className="text-[18px]" /> Retour au tableau de bord
+        </button>
+      </div>
+    );
+  }
 
   if (!e) {
     return (
@@ -49,10 +165,6 @@ export default function Paiement() {
       </div>
     );
   }
-
-  const tr = tempsReel[id] ?? {};
-  const live = tr.live ?? "Absent";
-  const paiements = historiquePaiements(id);
 
   const salaireMois = compo.base + compo.primes - compo.retenues;
   const net = Math.max(0, salaireMois - avances);

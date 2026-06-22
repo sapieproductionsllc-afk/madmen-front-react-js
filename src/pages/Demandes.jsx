@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
@@ -6,37 +6,78 @@ import Avatar from "../components/ui/Avatar.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import { Input, Select, Field, champClass } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { demandes, employes } from "../data/datasets.js";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/120?u=${encodeURIComponent(id)}`;
-const empById = Object.fromEntries(employes.map((e) => [e.id, e]));
 
 const ICONE_TYPE = { "Congé": "event", Permission: "schedule", "Avance sur salaire": "payments", Avance: "payments", Absence: "report", Autre: "description" };
 const TONE_STATUT = { "En attente": "amber", "Approuvée": "emerald", "Refusée": "rose" };
-const STATUTS_MOCK = ["En attente", "En attente", "Approuvée", "En attente", "Refusée"];
 const TYPES = ["Congé", "Permission", "Avance sur salaire", "Autre"];
 
-const demandesInitiales = demandes.map((d, i) => ({
-  id: d.id, employeId: d.employeId, type: d.type, periode: d.periode, motif: d.motif,
-  statut: STATUTS_MOCK[i % STATUTS_MOCK.length], soumisLe: d.soumisLe,
-}));
+// Traduit le statut renvoyé par l'API vers les libellés attendus par le front.
+const STATUT_API = {
+  en_attente: "En attente", "en attente": "En attente", attente: "En attente", pending: "En attente",
+  approuve: "Approuvée", approuvee: "Approuvée", "approuvée": "Approuvée", approved: "Approuvée", valide: "Approuvée", validee: "Approuvée",
+  refuse: "Refusée", refusee: "Refusée", "refusée": "Refusée", rejected: "Refusée", rejete: "Refusée", rejetee: "Refusée",
+};
+const mapStatut = (s) => STATUT_API[String(s ?? "").toLowerCase().trim()] || "En attente";
 
-const CATS = [
-  { key: "En attente", label: "À traiter" },
-  { key: "Toutes", label: "Toutes" },
-  { key: "Approuvée", label: "Approuvées" },
-  { key: "Refusée", label: "Refusées" },
-];
+// Compose une période lisible à partir des dates API (le mock avait un champ libre `periode`).
+const mapPeriode = (d) => {
+  const a = d.date_debut || "";
+  const b = d.date_fin || "";
+  if (a && b && a !== b) return `${a} → ${b}`;
+  return a || b || "—";
+};
+
+// Demande API -> forme attendue par le JSX (champs identiques au mock).
+function mapDemande(d) {
+  return {
+    id: d.reference || d.id, // identifiant métier (ex. DM-201) ; fallback id numérique
+    employeId: d.matricule || "", // lookup vers l'employé (indexé par matricule)
+    type: d.type || "Autre",
+    periode: mapPeriode(d),
+    motif: d.objet || "", // `objet` API = motif affiché
+    statut: mapStatut(d.statut),
+    soumisLe: d.soumisLe || "", // non garanti par l'API : valeur neutre
+  };
+}
 
 export default function Demandes({ embedded = false }) {
   const { toast } = useUI();
-  const [liste, setListe] = useState(demandesInitiales);
+  const [employes, setEmployes] = useState([]);
+  const [liste, setListe] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
   const [cat, setCat] = useState("En attente");
-  const [agent, setAgent] = useState(employes[0]?.id ?? "");
+  const [agent, setAgent] = useState("");
   const [type, setType] = useState("Congé");
   const [periode, setPeriode] = useState("");
   const [motif, setMotif] = useState("");
   const [compteur, setCompteur] = useState(301);
+
+  // Données RÉELLES depuis l'API (remplace les mocks de src/data).
+  useEffect(() => {
+    Promise.all([apiGet("/api/demandes"), apiGet("/api/employes")])
+      .then(([dem, emp]) => {
+        const listeEmp = (Array.isArray(emp) ? emp : []).map(mapEmploye);
+        setEmployes(listeEmp);
+        setAgent((a) => a || listeEmp[0]?.id || "");
+        setListe((Array.isArray(dem) ? dem : []).map(mapDemande));
+      })
+      .catch((e) => setErreur(e.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
+
+  const empById = useMemo(() => Object.fromEntries(employes.map((e) => [e.id, e])), [employes]);
+
+  const CATS = [
+    { key: "En attente", label: "À traiter" },
+    { key: "Toutes", label: "Toutes" },
+    { key: "Approuvée", label: "Approuvées" },
+    { key: "Refusée", label: "Refusées" },
+  ];
 
   const compte = (k) => (k === "Toutes" ? liste.length : liste.filter((d) => d.statut === k).length);
   const filtre = useMemo(() => (cat === "Toutes" ? liste : liste.filter((d) => d.statut === cat)), [liste, cat]);
@@ -103,44 +144,58 @@ export default function Demandes({ embedded = false }) {
           </div>
 
           <div className="space-y-2.5">
-            {filtre.map((d) => {
-              const ag = d.employeId ? empById[d.employeId] : null;
-              return (
-                <div key={d.id} className="card p-4 flex items-start gap-3">
-                  {ag ? (
-                    <Avatar src={photoDe(ag.id)} name={ag.name} size="w-10 h-10" />
-                  ) : (
-                    <span className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0"><Icon name={ICONE_TYPE[d.type] ?? "description"} className="text-[20px]" filled /></span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-ink truncate">{ag?.name ?? "Demande interne"}</p>
-                      <span className="inline-flex items-center gap-1 text-[11px] text-muted bg-surface-2 border border-border rounded-full px-2 py-0.5">
-                        <Icon name={ICONE_TYPE[d.type] ?? "description"} className="text-[13px]" /> {d.type}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted mt-0.5 inline-flex items-center gap-1"><Icon name="calendar_month" className="text-[14px] text-faint" /> {d.periode}</p>
-                    <p className="text-xs text-subtle mt-0.5 line-clamp-2">{d.motif}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <StatusPill label={d.statut} tone={TONE_STATUT[d.statut] ?? "slate"} />
-                    {d.statut === "En attente" ? (
-                      <div className="flex gap-1.5">
-                        <Button size="sm" variant="success-soft" icon="check" onClick={() => decider(d.id, "Approuvée")}>Approuver</Button>
-                        <Button size="sm" variant="danger-soft" icon="close" onClick={() => decider(d.id, "Refusée")}>Refuser</Button>
-                      </div>
-                    ) : (
-                      <button onClick={() => decider(d.id, "En attente")} className="text-xs text-muted hover:text-texte underline-offset-2 hover:underline">Revenir en attente</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {filtre.length === 0 && (
+            {chargement ? (
               <div className="card py-12 text-center">
-                <Icon name="inbox" className="text-faint text-[36px]" />
-                <p className="mt-2 text-sm text-muted">Aucune demande dans cette catégorie.</p>
+                <Icon name="progress_activity" className="text-faint text-[36px] animate-spin" />
+                <p className="mt-2 text-sm text-muted">Chargement des demandes…</p>
               </div>
+            ) : erreur ? (
+              <div className="card py-12 text-center">
+                <Icon name="error" className="text-rose-500 text-[36px]" />
+                <p className="mt-2 text-sm text-muted">{erreur}</p>
+              </div>
+            ) : (
+              <>
+                {filtre.map((d) => {
+                  const ag = d.employeId ? empById[d.employeId] : null;
+                  return (
+                    <div key={d.id} className="card p-4 flex items-start gap-3">
+                      {ag ? (
+                        <Avatar src={photoDe(ag.id)} name={ag.name} size="w-10 h-10" />
+                      ) : (
+                        <span className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0"><Icon name={ICONE_TYPE[d.type] ?? "description"} className="text-[20px]" filled /></span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-ink truncate">{ag?.name ?? "Demande interne"}</p>
+                          <span className="inline-flex items-center gap-1 text-[11px] text-muted bg-surface-2 border border-border rounded-full px-2 py-0.5">
+                            <Icon name={ICONE_TYPE[d.type] ?? "description"} className="text-[13px]" /> {d.type}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted mt-0.5 inline-flex items-center gap-1"><Icon name="calendar_month" className="text-[14px] text-faint" /> {d.periode}</p>
+                        <p className="text-xs text-subtle mt-0.5 line-clamp-2">{d.motif}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <StatusPill label={d.statut} tone={TONE_STATUT[d.statut] ?? "slate"} />
+                        {d.statut === "En attente" ? (
+                          <div className="flex gap-1.5">
+                            <Button size="sm" variant="success-soft" icon="check" onClick={() => decider(d.id, "Approuvée")}>Approuver</Button>
+                            <Button size="sm" variant="danger-soft" icon="close" onClick={() => decider(d.id, "Refusée")}>Refuser</Button>
+                          </div>
+                        ) : (
+                          <button onClick={() => decider(d.id, "En attente")} className="text-xs text-muted hover:text-texte underline-offset-2 hover:underline">Revenir en attente</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {filtre.length === 0 && (
+                  <div className="card py-12 text-center">
+                    <Icon name="inbox" className="text-faint text-[36px]" />
+                    <p className="mt-2 text-sm text-muted">Aucune demande dans cette catégorie.</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

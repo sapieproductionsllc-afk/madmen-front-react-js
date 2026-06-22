@@ -1,30 +1,10 @@
+import { useEffect, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Button from "../components/ui/Button.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-
-// Deux appareils biométriques principaux : la pointeuse ZKTeco K40 et la caméra Watchman.
-const APPAREILS = [
-  {
-    id: "K40", nom: "ZKTeco K40", type: "Pointeuse à empreinte", icon: "fingerprint", bg: "bg-brand-50 text-brand-600",
-    status: "En ligne", ip: "192.168.1.40", firmware: "v6.60", emplacement: "Entrée principale", derniereSync: "il y a 2 min",
-    stats: [
-      { label: "Empreintes", value: "248" },
-      { label: "Pointages du jour", value: "96" },
-      { label: "Capacité", value: "1 000" },
-    ],
-  },
-  {
-    id: "WM", nom: "Watchman", type: "Reconnaissance faciale", icon: "face", bg: "bg-or-100 text-or-700",
-    status: "En ligne", ip: "192.168.1.52", firmware: "v3.12", emplacement: "Open-space", derniereSync: "il y a 1 min",
-    stats: [
-      { label: "Visages", value: "212" },
-      { label: "Détections du jour", value: "88" },
-      { label: "Capacité", value: "3 000" },
-    ],
-  },
-];
+import { apiGet } from "../lib/api.js";
 
 const EVENEMENTS = [
   { id: 1, agent: "Karim Benali", action: "Pointage — entrée", appareil: "ZKTeco K40", heure: "08:42", icon: "login", bg: "bg-emerald-50 text-emerald-600" },
@@ -34,6 +14,36 @@ const EVENEMENTS = [
   { id: 5, agent: "Marcus Thorne", action: "Pointage — entrée", appareil: "ZKTeco K40", heure: "08:28", icon: "login", bg: "bg-emerald-50 text-emerald-600" },
   { id: 6, agent: "Amélie Dubois", action: "Reconnaissance faciale", appareil: "Watchman", heure: "08:24", icon: "face", bg: "bg-or-100 text-or-700" },
 ];
+
+// Choix de l'icône/couleur de carte selon le type d'appareil renvoyé par l'API.
+function styleType(type) {
+  const t = (type || "").toLowerCase();
+  if (t.includes("facial") || t.includes("visage") || t.includes("face") || t.includes("caméra") || t.includes("camera"))
+    return { icon: "face", bg: "bg-or-100 text-or-700" };
+  if (t.includes("rfid") || t.includes("badge"))
+    return { icon: "badge", bg: "bg-brand-50 text-brand-600" };
+  // Empreinte / pointeuse par défaut
+  return { icon: "fingerprint", bg: "bg-brand-50 text-brand-600" };
+}
+
+// Appareil API {id,name,type,agence,status,lastSync} -> objet attendu par CarteAppareil.
+// Champs absents de l'API mis à une valeur neutre pour ne rien casser : ip, firmware, stats.
+function mapAppareil(a) {
+  const { icon, bg } = styleType(a.type);
+  return {
+    id: a.id,
+    nom: a.name || "—",
+    type: a.type || "—",
+    icon,
+    bg,
+    status: a.status || "—",
+    ip: a.ip || "—", // absent de l'API
+    firmware: a.firmware || "—", // absent de l'API
+    emplacement: a.agence || "—",
+    derniereSync: a.lastSync || "—",
+    stats: [], // absent de l'API : aucune carte stat affichée
+  };
+}
 
 function Meta({ label, value }) {
   return (
@@ -84,6 +94,17 @@ function CarteAppareil({ a, onSync, onConfig }) {
 
 export default function Appareils({ embedded = false }) {
   const { toast } = useUI();
+  const [appareils, setAppareils] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  // Données RÉELLES depuis l'API (remplace les mocks de src/data).
+  useEffect(() => {
+    apiGet("/api/appareils")
+      .then((data) => setAppareils((Array.isArray(data) ? data : []).map(mapAppareil)))
+      .catch((e) => setErreur(e?.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
 
   const actions = (
     <div className="flex gap-2 shrink-0">
@@ -94,11 +115,23 @@ export default function Appareils({ embedded = false }) {
 
   const corps = (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {APPAREILS.map((a) => (
-          <CarteAppareil key={a.id} a={a} onSync={(d) => toast(`${d.nom} synchronisé`, "success")} onConfig={(d) => toast(`Configuration de ${d.nom} ouverte`, "info")} />
-        ))}
-      </div>
+      {chargement ? (
+        <div className="card py-16 text-center">
+          <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+          <p className="mt-2 text-sm text-muted">Chargement des appareils…</p>
+        </div>
+      ) : erreur ? (
+        <div className="card py-16 text-center">
+          <Icon name="error" className="text-rose-500 text-[40px]" />
+          <p className="mt-2 text-sm text-muted">{erreur}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {appareils.map((a) => (
+            <CarteAppareil key={a.id} a={a} onSync={(d) => toast(`${d.nom} synchronisé`, "success")} onConfig={(d) => toast(`Configuration de ${d.nom} ouverte`, "info")} />
+          ))}
+        </div>
+      )}
 
       <section className="card overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Button from "../components/ui/Button.jsx";
 import { Input, Select, Field } from "../components/ui/Input.jsx";
@@ -8,6 +8,7 @@ import StatusPill from "../components/ui/StatusPill.jsx";
 import Modal from "../components/ui/Modal.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { employes } from "../data/datasets.js";
+import { apiGet } from "../lib/api.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/80?u=${encodeURIComponent(id)}`;
 const empById = Object.fromEntries(employes.map((e) => [e.id, e]));
@@ -23,12 +24,26 @@ const TONE_STATUT = { "En cours": "sky", Atteint: "emerald", "En retard": "amber
 const CATEGORIES = ["Performance", "Présence", "Formation", "Développement personnel"];
 const STATUTS = ["En cours", "Atteint", "En retard"];
 
-const SEED = [
-  { id: 1, titre: "Atteindre 95 % de présence mensuelle", categorie: "Présence", echeance: "2026-07-31", progression: 78, statut: "En cours", portee: "Partagé", tous: true, membres: [] },
-  { id: 2, titre: "Réduire les retards de l'équipe à moins de 3 %", categorie: "Performance", echeance: "2026-06-15", progression: 100, statut: "Atteint", portee: "Partagé", tous: false, membres: ["AUR-2241", "AUR-3398", "AUR-1102"] },
-  { id: 3, titre: "Former 12 agents au logiciel de pointage", categorie: "Formation", echeance: "2026-05-30", progression: 40, statut: "En retard", portee: "Partagé", tous: false, membres: ["AUR-1187", "AUR-8821", "AUR-6654", "AUR-7012"] },
-  { id: 4, titre: "Préparer la revue stratégique trimestrielle", categorie: "Développement personnel", echeance: "2026-09-30", progression: 25, statut: "En cours", portee: "Personnel", tous: false, membres: [] },
-];
+// Traduction des valeurs API -> libellés attendus par le JSX (catégories/statuts).
+const CATEGORIE_API = { performance: "Performance", formation: "Formation", perso: "Développement personnel" };
+const STATUT_API = { en_cours: "En cours", atteint: "Atteint", abandonne: "En retard" };
+
+// Mappe un objectif renvoyé par l'API vers la forme consommée par le JSX.
+// Les objectifs /api/me sont personnels (scopés au jeton) : pas de portée partagée
+// ni de membres côté API -> valeurs neutres pour ne rien casser dans l'affichage.
+function mapObjectif(o) {
+  return {
+    id: o.id,
+    titre: o.titre ?? "",
+    categorie: CATEGORIE_API[o.categorie] ?? o.categorie ?? "",
+    echeance: o.echeance ?? "",
+    progression: typeof o.progression === "number" ? o.progression : Number(o.progression) || 0,
+    statut: STATUT_API[o.statut] ?? "En cours",
+    portee: "Personnel",
+    tous: false,
+    membres: [],
+  };
+}
 
 const CATS = [
   { key: "Tous", label: "Tous" },
@@ -136,8 +151,20 @@ function CarteObjectif({ objectif, onGerer, onSupprimer }) {
 
 export default function Objectifs() {
   const { toast, confirm } = useUI();
-  const [objectifs, setObjectifs] = useState(SEED);
+  const [objectifs, setObjectifs] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
   const [cat, setCat] = useState("Tous");
+
+  // Charge les VRAIS objectifs de l'employé connecté (JWT géré par api.js).
+  useEffect(() => {
+    setChargement(true);
+    setErreur(null);
+    apiGet("/api/me/objectifs")
+      .then((data) => setObjectifs(Array.isArray(data) ? data.map(mapObjectif) : []))
+      .catch((e) => setErreur(e?.message || "Impossible de charger les objectifs."))
+      .finally(() => setChargement(false));
+  }, []);
 
   // Création
   const [titre, setTitre] = useState("");
@@ -231,7 +258,17 @@ export default function Objectifs() {
       </div>
 
       {/* Grille */}
-      {liste.length === 0 ? (
+      {chargement ? (
+        <div className="card py-14 text-center">
+          <Icon name="progress_activity" className="text-faint text-[36px] animate-spin" />
+          <p className="mt-2 text-sm text-muted">Chargement des objectifs…</p>
+        </div>
+      ) : erreur ? (
+        <div className="card py-14 text-center">
+          <Icon name="error" className="text-faint text-[36px]" />
+          <p className="mt-2 text-sm text-muted">{erreur}</p>
+        </div>
+      ) : liste.length === 0 ? (
         <div className="card py-14 text-center">
           <Icon name="flag" className="text-faint text-[36px]" />
           <p className="mt-2 text-sm text-muted">{objectifs.length === 0 ? "Aucun objectif pour l'instant — créez-en un ci-dessus." : cat === "Personnel" ? "Aucun objectif personnel." : "Aucun objectif partagé."}</p>

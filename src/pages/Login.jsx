@@ -52,11 +52,11 @@ export default function Login() {
   const isLoading = mode !== null;
 
   // Connexion par PIN/empreinte avec retour visuel (chargement) et gestion d'erreur.
-  const lancerConnexion = (methode) => {
+  const lancerConnexion = async (methode) => {
     if (isLoading) return;
     setErreur("");
 
-    if (methode === "pin" && (!matricule.trim() || !pin.trim())) {
+    if (!matricule.trim() || !pin.trim()) {
       setErreur("Renseignez votre matricule et votre code PIN.");
       return;
     }
@@ -68,11 +68,20 @@ export default function Login() {
     }
 
     setMode(methode);
-    // Petite latence pour matérialiser l'état de connexion (logique inchangée).
-    setTimeout(() => {
-      login();
+    // Connexion RÉELLE contre l'API (matricule + PIN -> JWT).
+    try {
+      await login(matricule.trim(), pin.trim(), souvenir);
       navigate("/", { replace: true });
-    }, 650);
+    } catch (e) {
+      setMode(null);
+      setErreur(
+        e.status === 401 ? "Matricule ou code PIN incorrect."
+          : e.status === 403 ? "Compte suspendu."
+          : e.status === 429 ? "Trop de tentatives, réessayez plus tard."
+          : e.network ? "API injoignable — vérifiez que le serveur est démarré."
+          : (e.message || "Connexion impossible.")
+      );
+    }
   };
 
   const seConnecter = (e) => {

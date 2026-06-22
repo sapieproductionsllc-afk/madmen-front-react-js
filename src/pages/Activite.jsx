@@ -1,25 +1,67 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
 import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import CarteActivite from "../components/ui/CarteActivite.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { employes, tempsReel, ordreLive } from "../data/datasets.js";
+import { apiGet } from "../lib/api.js";
+import { mapEmploye } from "../lib/mappers.js";
+import { ordreLive } from "../data/datasets.js";
 
-const liveDe = (e) => tempsReel[e.id]?.live ?? "Absent";
-
-const cats = [
-  { key: "Tous", test: () => true },
-  { key: "Actifs", test: (e) => liveDe(e) === "En activité" },
-  { key: "En pause", test: (e) => liveDe(e) === "En pause" },
-  { key: "Hors ligne", test: (e) => ["Absent", "Congé"].includes(liveDe(e)) },
-];
+// MAPPING local : réponse API /api/presence/temps-reel -> forme attendue par le JSX.
+// L'API renvoie [{ employe_id, matricule, name, live, detail, depuis }].
+// On en dérive deux choses, comme dans les mocks :
+//  - `employes` : objets agent (via mapEmploye, champs identiques au mock)
+//  - `tempsReel` : index matricule -> { live, detail, depuis }
+function mapTempsReel(data) {
+  const rows = Array.isArray(data) ? data : [];
+  const employes = rows.map((r) =>
+    // mapEmploye attend la forme API employé ; on lui passe ce que l'endpoint fournit.
+    // Les champs absents (poste, département, fonction) tombent sur des valeurs neutres.
+    mapEmploye({ id: r.employe_id, matricule: r.matricule, name: r.name })
+  );
+  const tempsReel = {};
+  for (const r of rows) {
+    // indexé par matricule (= e.id côté front)
+    tempsReel[r.matricule] = {
+      live: r.live ?? "Absent",
+      detail: r.detail ?? "",
+      depuis: r.depuis ?? "—",
+    };
+  }
+  return { employes, tempsReel };
+}
 
 export default function Activite() {
   const { toast } = useUI();
+  const [employes, setEmployes] = useState([]);
+  const [tempsReel, setTempsReel] = useState({});
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Tous");
+
+  // Données RÉELLES depuis l'API (remplace les mocks de src/data).
+  useEffect(() => {
+    apiGet("/api/presence/temps-reel")
+      .then((data) => {
+        const { employes, tempsReel } = mapTempsReel(data);
+        setEmployes(employes);
+        setTempsReel(tempsReel);
+      })
+      .catch((e) => setErreur(e.message || "Erreur de chargement"))
+      .finally(() => setChargement(false));
+  }, []);
+
+  const liveDe = (e) => tempsReel[e.id]?.live ?? "Absent";
+
+  const cats = [
+    { key: "Tous", test: () => true },
+    { key: "Actifs", test: (e) => liveDe(e) === "En activité" },
+    { key: "En pause", test: (e) => liveDe(e) === "En pause" },
+    { key: "Hors ligne", test: (e) => ["Absent", "Congé"].includes(liveDe(e)) },
+  ];
 
   const compte = (k) => employes.filter(cats.find((c) => c.key === k).test).length;
 
@@ -29,7 +71,8 @@ export default function Activite() {
     return employes
       .filter((e) => test(e) && (!t || e.name.toLowerCase().includes(t) || e.id.toLowerCase().includes(t) || e.fonction.toLowerCase().includes(t) || e.department.toLowerCase().includes(t)))
       .sort((a, b) => (ordreLive[liveDe(a)] ?? 9) - (ordreLive[liveDe(b)] ?? 9));
-  }, [q, cat]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, cat, employes, tempsReel]);
 
   return (
     <div className="space-y-5 pb-12">
@@ -57,7 +100,17 @@ export default function Activite() {
         <SearchInput value={q} onChange={setQ} placeholder="Rechercher un agent…" className="sm:ml-auto sm:w-72" />
       </div>
 
-      {liste.length === 0 ? (
+      {chargement ? (
+        <div className="card py-16 text-center">
+          <Icon name="progress_activity" className="text-faint text-[40px] animate-spin" />
+          <p className="mt-2 text-sm text-muted">Chargement de l'activité…</p>
+        </div>
+      ) : erreur ? (
+        <div className="card py-16 text-center">
+          <Icon name="error" className="text-rose-500 text-[40px]" />
+          <p className="mt-2 text-sm text-muted">{erreur}</p>
+        </div>
+      ) : liste.length === 0 ? (
         <div className="card py-16 text-center">
           <Icon name="search_off" className="text-faint text-[40px]" />
           <p className="mt-2 text-sm text-muted">Aucun agent ne correspond.</p>
