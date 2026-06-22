@@ -25,15 +25,20 @@ export default function Modal({ open, onClose, title, subtitle, icon, iconTone =
   const panelRef = useRef(null);
   const closeRef = useRef(null);
   const previousFocus = useRef(null);
+  const onCloseRef = useRef(onClose);
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const subtitleId = `${baseId}-subtitle`;
 
-  // Escape + scroll-lock + restauration du focus.
+  // Garde la dernière version d'onClose sans relancer l'effet de focus à chaque rendu.
+  useEffect(() => { onCloseRef.current = onClose; });
+
+  // Escape + scroll-lock + restauration du focus — NE dépend QUE de `open`
+  // (sinon, à chaque frappe, le cleanup rendrait le focus à l'élément précédent → l'input « coupe »).
   useEffect(() => {
     if (!open) return undefined;
     previousFocus.current = document.activeElement;
-    const handler = (e) => e.key === "Escape" && onClose?.();
+    const handler = (e) => e.key === "Escape" && onCloseRef.current?.();
     window.addEventListener("keydown", handler);
     document.body.style.overflow = "hidden";
     return () => {
@@ -42,7 +47,7 @@ export default function Modal({ open, onClose, title, subtitle, icon, iconTone =
       // Restaure le focus sur l'élément déclencheur à la fermeture.
       if (previousFocus.current instanceof HTMLElement) previousFocus.current.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   // À l'ouverture : place le focus sur le premier élément interactif (ou le bouton Fermer).
   useEffect(() => {
