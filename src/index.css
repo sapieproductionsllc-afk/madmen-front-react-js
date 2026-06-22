@@ -201,7 +201,7 @@ body {
 @keyframes modalIn {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
+    transform: translateY(14px) scale(0.965);
   }
   to {
     opacity: 1;
@@ -209,7 +209,7 @@ body {
   }
 }
 .modal-in {
-  animation: modalIn 0.22s var(--ease-out);
+  animation: modalIn 0.24s var(--ease-out);
 }
 @keyframes toastIn {
   from {
@@ -278,6 +278,51 @@ body {
   animation: haloPulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* Graphe (AreaChart) : tracé progressif + apparition de l'aire et du point. */
+@keyframes acDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes acFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.ac-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: acDraw 1.3s var(--ease-out) 0.15s forwards;
+}
+.ac-area {
+  opacity: 0;
+  animation: acFade 0.9s ease 0.55s forwards;
+}
+.ac-dot {
+  opacity: 0;
+  animation: acFade 0.45s ease 1.25s forwards;
+}
+
+/* Moniteur K40 : défilement continu du tracé ECG (sans couture car le motif est doublé). */
+@keyframes ecgScroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.ecg-scroll {
+  animation: ecgScroll 2.7s linear infinite;
+}
+/* Grille « papier ECG » de l'écran du moniteur K40. */
+.ecg-grid {
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.1) 1px, transparent 1px);
+  background-size: 9px 9px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal,
   .modal-in,
@@ -286,6 +331,16 @@ body {
   .overlay-in {
     animation: none;
     opacity: 1;
+  }
+  .ac-line,
+  .ac-area,
+  .ac-dot {
+    animation: none;
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+  .ecg-scroll {
+    animation: none;
   }
   .live-dot::before,
   .agent-halo {

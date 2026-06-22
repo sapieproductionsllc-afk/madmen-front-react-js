@@ -1,5 +1,12 @@
 import { NavLink } from "react-router-dom";
 import Icon from "../ui/Icon.jsx";
+import logo from "../../assets/logo.png";
+
+// Tracé « ECG » du moniteur K40 : un battement relatif (dx total = 100, revient à la ligne),
+// répété deux fois pour un défilement sans couture (translateX -50%).
+const BEAT = "h10 q4,-5 8,0 h6 l2,2 l3,-16 l3,22 l3,-8 h8 q6,-6 12,0 h45";
+const ECG = `M0,20 ${BEAT} ${BEAT}`;
+const K40_CONNECTE = true; // état de la pointeuse K40 (à brancher au backend)
 
 // Navigation regroupée par pôle métier (chaque page a un rôle unique).
 // NB : Alertes → accessible via la cloche du header ; Enrôlement → via la page Employés.
@@ -12,27 +19,17 @@ const navGroups = [
     ],
   },
   {
-    title: "Personnel",
-    items: [{ label: "Agents", icon: "groups", to: "/employes" }],
-  },
-  {
-    title: "Temps & Activité",
+    title: "Gestion",
     items: [
-      { label: "Présence & Pointage", icon: "co_present", to: "/presence" },
-      { label: "Activité", icon: "desktop_windows", to: "/activite" },
+      { label: "Agents", icon: "groups", to: "/employes" },
+      { label: "Finance & Paie", icon: "payments", to: "/finance" },
+      // Objectifs masqué du menu (page et route conservées : /objectifs).
+      { label: "Communication", icon: "forum", to: "/communication" },
     ],
   },
   {
-    title: "Finance & Paie",
-    items: [{ label: "Finance & Paie", icon: "payments", to: "/finance" }],
-  },
-  {
-    title: "Administration",
-    items: [
-      { label: "Appareils biométriques", icon: "sensors", to: "/appareils" },
-      { label: "Utilisateurs & Rôles", icon: "admin_panel_settings", to: "/utilisateurs" },
-      { label: "Paramètres", icon: "settings", to: "/parametres" },
-    ],
+    title: "Système",
+    items: [{ label: "Administration", icon: "admin_panel_settings", to: "/administration" }],
   },
 ];
 
@@ -95,8 +92,8 @@ export default function SideNav({ open, onClose }) {
         {/* Marque (mobile : avec bouton fermer) */}
         <div className="px-2 mb-6 flex items-center justify-between lg:hidden">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-xl bg-sand flex items-center justify-center shadow-soft">
-              <Icon name="fingerprint" className="text-brand-700 text-[18px]" filled />
+            <span className="w-9 h-9 rounded-xl bg-sand flex items-center justify-center shadow-soft p-1">
+              <img src={logo} alt="MADMEN" className="w-full h-full object-contain" />
             </span>
             <span className="text-base font-bold text-white tracking-tight">MADMEN</span>
           </div>
@@ -127,19 +124,28 @@ export default function SideNav({ open, onClose }) {
         <div className="px-1 pt-5">
           <div className="relative overflow-hidden rounded-2xl bg-sand p-4 text-ink shadow-card">
             <div className="relative">
-              <div className="flex items-center gap-2.5 mb-2">
-                <span className="w-8 h-8 rounded-xl bg-brand-600 flex items-center justify-center">
-                  <Icon name="qr_code_scanner" className="text-canvas text-[18px]" />
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-8 h-8 rounded-xl bg-brand-600 flex items-center justify-center shrink-0">
+                    <Icon name="fingerprint" className="text-canvas text-[18px]" filled />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold tracking-tight leading-none">K40</p>
+                    <p className="text-[11px] text-ink/60 mt-1">Pointeuse biométrique</p>
+                  </div>
+                </div>
+                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${K40_CONNECTE ? "text-emerald-600" : "text-rose-600"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${K40_CONNECTE ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                  {K40_CONNECTE ? "Connecté" : "Hors ligne"}
                 </span>
-                <span className="text-sm font-semibold tracking-tight">Scan rapide</span>
               </div>
-              <p className="text-xs text-ink/70 leading-relaxed mb-3.5">
-                Pointez un employé via son badge ou son empreinte.
-              </p>
-              <button className="w-full bg-brand-600 hover:bg-brand-700 active:translate-y-px text-canvas text-xs font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5">
-                <Icon name="bolt" className="text-[16px]" filled />
-                Lancer un scan
-              </button>
+              <div className="relative h-12 rounded-lg overflow-hidden bg-[#08160f] ecg-grid ring-1 ring-black/30">
+                <svg viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true" className={`absolute inset-y-0 h-full ${K40_CONNECTE ? "ecg-scroll" : ""}`} style={{ width: K40_CONNECTE ? "200%" : "100%", filter: `drop-shadow(0 0 2.5px ${K40_CONNECTE ? "rgba(52,211,153,.85)" : "rgba(240,113,106,.7)"})` }}>
+                  <path d={K40_CONNECTE ? ECG : "M0,20 H200"} fill="none" stroke={K40_CONNECTE ? "#34d399" : "#f0716a"} strokeWidth="1.7" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+                </svg>
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-[#08160f] to-transparent" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-gradient-to-l from-[#08160f] to-transparent" />
+              </div>
             </div>
           </div>
         </div>

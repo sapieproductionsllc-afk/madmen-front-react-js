@@ -6,6 +6,8 @@ const map = {
   indigo: ["bg-brand-50 text-brand-600", "bg-brand-500"],
   sky: ["bg-sky-50 text-sky-600", "bg-sky-500"],
   violet: ["bg-brand-50 text-brand-600", "bg-brand-500"],
+  brand: ["bg-brand-50 text-brand-600", "bg-brand-500"],
+  or: ["bg-or-100 text-or-700", "bg-or-500"],
 };
 
 export default function StatusPill({ label, tone = "slate", dot = true }) {

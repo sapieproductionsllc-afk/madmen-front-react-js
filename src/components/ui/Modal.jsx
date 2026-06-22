@@ -8,6 +8,16 @@ const widths = {
   xl: "max-w-4xl",
 };
 
+// Tons de la pastille d'icône (anneau subtil pour la profondeur).
+const tones = {
+  brand: "bg-brand-50 text-brand-600 ring-brand-600/10",
+  danger: "bg-rose-50 text-rose-600 ring-rose-600/10",
+  or: "bg-or-100 text-or-700 ring-or-600/15",
+  emerald: "bg-emerald-50 text-emerald-600 ring-emerald-600/10",
+  sky: "bg-sky-50 text-sky-600 ring-sky-600/10",
+  amber: "bg-amber-50 text-amber-600 ring-amber-600/10",
+};
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -64,11 +74,11 @@ export default function Modal({ open, onClose, title, subtitle, icon, iconTone =
 
   if (!open) return null;
 
-  const tone = iconTone === "danger" ? "bg-rose-50 text-rose-600" : "bg-brand-50 text-brand-600";
+  const tone = tones[iconTone] ?? tones.brand;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-ink/55 backdrop-blur-md overlay-in" onClick={onClose} />
       <div
         ref={panelRef}
         role="dialog"
@@ -76,32 +86,35 @@ export default function Modal({ open, onClose, title, subtitle, icon, iconTone =
         aria-labelledby={titleId}
         aria-describedby={subtitle ? subtitleId : undefined}
         onKeyDown={onKeyDownTrap}
-        className={`relative w-full ${widths[size]} bg-surface border border-border rounded-t-2xl sm:rounded-2xl shadow-pop max-h-[92vh] flex flex-col modal-in`}
+        className={`relative w-full ${widths[size]} bg-surface ring-1 ring-black/5 border border-border rounded-t-2xl sm:rounded-2xl shadow-pop max-h-[92vh] flex flex-col modal-in`}
       >
-        <div className="flex items-start gap-3 p-5 border-b border-border">
+        {/* En-tête */}
+        <div className="flex items-start gap-3.5 px-5 sm:px-6 pt-5 pb-4 border-b border-border">
           {icon && (
-            <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${tone}`}>
-              <Icon name={icon} className="text-[22px]" />
+            <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ring-1 ${tone}`}>
+              <Icon name={icon} className="text-[24px]" filled />
             </span>
           )}
-          <div className="flex-1 min-w-0">
-            <h3 id={titleId} className="text-[1.0625rem] font-semibold text-ink tracking-tight">{title}</h3>
-            {subtitle && <p id={subtitleId} className="text-sm text-muted mt-0.5">{subtitle}</p>}
+          <div className="flex-1 min-w-0 pt-0.5">
+            <h3 id={titleId} className="text-[1.15rem] font-semibold text-ink tracking-tight leading-tight">{title}</h3>
+            {subtitle && <p id={subtitleId} className="text-sm text-muted mt-1 leading-snug">{subtitle}</p>}
           </div>
           <button
             ref={closeRef}
             onClick={onClose}
-            className="text-subtle hover:text-texte hover:bg-surface-2 rounded-lg p-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+            className="-mt-1 -mr-1.5 w-8 h-8 shrink-0 flex items-center justify-center text-subtle hover:text-texte hover:bg-surface-2 rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:shadow-focus"
             aria-label="Fermer"
           >
-            <Icon name="close" />
+            <Icon name="close" className="text-[20px]" />
           </button>
         </div>
 
-        <div className="p-5 overflow-y-auto scroll-thin">{children}</div>
+        {/* Corps */}
+        <div className="px-5 sm:px-6 py-5 overflow-y-auto scroll-thin">{children}</div>
 
+        {/* Pied */}
         {footer && (
-          <div className="flex flex-wrap justify-end gap-2 p-4 border-t border-border bg-surface-2 rounded-b-2xl">
+          <div className="flex flex-wrap justify-end gap-2 px-5 sm:px-6 py-4 border-t border-border bg-surface-2/60 rounded-b-2xl">
             {footer}
           </div>
         )}

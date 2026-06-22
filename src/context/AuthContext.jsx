@@ -9,13 +9,14 @@ const utilisateurParDefaut = {
   role: "Directeur Général",
   matricule: "AUR-8821",
   email: "e.vance@madmen.io",
+  telephone: "+242 06 12 34 56",
 };
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
       const enregistre = sessionStorage.getItem("madmen_user");
-      return enregistre ? JSON.parse(enregistre) : utilisateurParDefaut; /* TEMP-CAPTURE bypass */
+      return enregistre ? JSON.parse(enregistre) : null;
     } catch {
       return null;
     }

@@ -7,6 +7,7 @@ const variants = {
   ghost: "text-muted hover:bg-surface-2 hover:text-texte",
   danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm",
   "danger-soft": "bg-rose-50 text-rose-600 hover:bg-rose-100",
+  "success-soft": "bg-emerald-50 text-emerald-600 hover:bg-emerald-100",
 };
 
 const sizes = {

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
+import { FilterSelect } from "../components/ui/Input.jsx";
 import CarteAgent from "../components/ui/CarteAgent.jsx";
 import Avatar from "../components/ui/Avatar.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
@@ -83,8 +84,7 @@ export default function Dashboard() {
     return arr;
   }, [q, service, statut, tri]);
 
-  const selectCls =
-    "h-9 rounded-lg bg-surface border border-border-strong text-sm text-texte px-2.5 pr-7 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 cursor-pointer";
+  const filtreCls = "h-9 rounded-lg bg-surface border border-border-strong text-texte pl-2.5 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15";
 
   const colonnes = [
     {
@@ -129,16 +129,16 @@ export default function Dashboard() {
       {/* Barre d'outils */}
       <div className="flex flex-wrap items-center gap-2.5">
         <SearchInput value={q} onChange={setQ} placeholder="Filtrer par nom, service, poste…" className="w-full sm:w-auto sm:flex-1 sm:min-w-[220px]" />
-        <select value={service} onChange={(e) => setService(e.target.value)} className={selectCls} aria-label="Filtrer par service">
+        <FilterSelect value={service} onChange={(e) => setService(e.target.value)} className={filtreCls} aria-label="Filtrer par service">
           {services.map((s) => (
             <option key={s}>{s}</option>
           ))}
-        </select>
-        <select value={statut} onChange={(e) => setStatut(e.target.value)} className={selectCls} aria-label="Filtrer par statut">
+        </FilterSelect>
+        <FilterSelect value={statut} onChange={(e) => setStatut(e.target.value)} className={filtreCls} aria-label="Filtrer par statut">
           {statuts.map((s) => (
             <option key={s}>{s}</option>
           ))}
-        </select>
+        </FilterSelect>
         <div className="inline-flex rounded-lg border border-border-strong overflow-hidden">
           <button
             onClick={() => setVue("grille")}
@@ -157,11 +157,11 @@ export default function Dashboard() {
             <Icon name="view_list" className="text-[18px]" />
           </button>
         </div>
-        <select value={tri} onChange={(e) => setTri(e.target.value)} className={selectCls} aria-label="Trier par">
+        <FilterSelect value={tri} onChange={(e) => setTri(e.target.value)} className={filtreCls} aria-label="Trier par">
           <option value="arrivee">Tri : Heure d'arrivée</option>
           <option value="nom">Tri : Nom</option>
           <option value="statut">Tri : Statut</option>
-        </select>
+        </FilterSelect>
       </div>
 
       {/* Grille ou liste — pleine largeur */}

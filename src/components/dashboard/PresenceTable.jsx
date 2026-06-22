@@ -5,6 +5,7 @@ import Avatar from "../ui/Avatar.jsx";
 import Table from "../ui/Table.jsx";
 import Tabs from "../ui/Tabs.jsx";
 import SearchInput from "../ui/SearchInput.jsx";
+import { FilterSelect } from "../ui/Input.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import { presence } from "../../data/mockData.js";
 
@@ -107,16 +108,17 @@ export default function PresenceTable() {
           className="sm:w-64"
         />
         <Tabs tabs={onglets} active={filtre} onChange={setFiltre} />
-        <select
+        <FilterSelect
           value={agence}
           onChange={(e) => setAgence(e.target.value)}
           aria-label="Filtrer par agence"
-          className="rounded-lg bg-canvas border border-border px-3 py-2 text-sm text-texte outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 sm:ml-auto"
+          wrapClass="sm:ml-auto"
+          className="rounded-lg bg-canvas border border-border pl-3 py-2 text-texte focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
         >
           {agences.map((a) => (
             <option key={a}>{a}</option>
           ))}
-        </select>
+        </FilterSelect>
       </div>
 
       <Table

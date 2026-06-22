@@ -6,6 +6,7 @@ import AreaChart from "../components/ui/AreaChart.jsx";
 import { champClass } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import logo from "../assets/logo.png";
 
 // Champ : recette canonique partagée (Input.jsx) + place pour l'icône de droite.
 const champ = `${champClass} pr-11`;
@@ -90,9 +91,7 @@ export default function Login() {
         {/* ---------- Colonne formulaire ---------- */}
         <div className="relative z-10 flex flex-col p-7 sm:p-11">
           <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center shadow-sm shadow-brand-600/25">
-              <Icon name="fingerprint" className="text-canvas text-[22px]" filled />
-            </span>
+            <img src={logo} alt="MADMEN" className="w-10 h-10 object-contain" />
             <span className="text-lg font-semibold text-ink tracking-tight">MADMEN</span>
           </div>
 
@@ -244,7 +243,7 @@ export default function Login() {
                   <Icon name="arrow_upward" className="text-[12px]" />3,2 %
                 </span>
               </div>
-              <AreaChart data={[58, 64, 61, 70, 67, 76, 80, 86, 90, 94]} height={46} color="#d2be9b" id="loginprev" />
+              <AreaChart data={[58, 64, 61, 70, 67, 76, 80, 86, 90, 94]} height={46} color="#d2be9b" id="loginprev" animate />
               <div className="grid grid-cols-2 gap-2.5 mt-4">
                 <div className="rounded-xl bg-white/[0.07] border border-white/10 p-2.5">
                   <p className="text-[10px] font-medium text-white/50 uppercase tracking-wider mb-0.5">Productivité</p>

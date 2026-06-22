@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, ProtectedRoute } from "./context/AuthContext.jsx";
 import { UIProvider } from "./components/ui/UIProvider.jsx";
 import Layout from "./components/layout/Layout.jsx";
@@ -7,6 +7,8 @@ import Dashboard from "./pages/Dashboard.jsx";
 import Employes from "./pages/Employes.jsx";
 import ProfilEmploye from "./pages/ProfilEmploye.jsx";
 import ProfilDetails from "./pages/ProfilDetails.jsx";
+import Paiement from "./pages/Paiement.jsx";
+import Pointages from "./pages/Pointages.jsx";
 import Enrolement from "./pages/Enrolement.jsx";
 import Presence from "./pages/Presence.jsx";
 import Activite from "./pages/Activite.jsx";
@@ -14,9 +16,13 @@ import Productivite from "./pages/Productivite.jsx";
 import Finance from "./pages/Finance.jsx";
 import Rapports from "./pages/Rapports.jsx";
 import Alertes from "./pages/Alertes.jsx";
-import Appareils from "./pages/Appareils.jsx";
-import Utilisateurs from "./pages/Utilisateurs.jsx";
-import Parametres from "./pages/Parametres.jsx";
+import Objectifs from "./pages/Objectifs.jsx";
+import Demandes from "./pages/Demandes.jsx";
+import Messagerie from "./pages/Messagerie.jsx";
+import Communication from "./pages/Communication.jsx";
+import Administration from "./pages/Administration.jsx";
+import MonProfil from "./pages/MonProfil.jsx";
+import Aide from "./pages/Aide.jsx";
 import PagePlaceholder from "./pages/Placeholder.jsx";
 
 export default function App() {
@@ -39,14 +45,23 @@ export default function App() {
             <Route path="employes" element={<Employes />} />
             <Route path="employes/:id" element={<ProfilEmploye />} />
             <Route path="employes/:id/details" element={<ProfilDetails />} />
+            <Route path="employes/:id/paiement" element={<Paiement />} />
+            <Route path="employes/:id/pointages" element={<Pointages />} />
             <Route path="enrolement" element={<Enrolement />} />
             <Route path="presence" element={<Presence />} />
             <Route path="activite" element={<Activite />} />
             <Route path="productivite" element={<Productivite />} />
             <Route path="finance" element={<Finance />} />
-            <Route path="appareils" element={<Appareils />} />
-            <Route path="utilisateurs" element={<Utilisateurs />} />
-            <Route path="parametres" element={<Parametres />} />
+            <Route path="appareils" element={<Navigate to="/administration" replace state={{ section: "appareils" }} />} />
+            <Route path="utilisateurs" element={<Navigate to="/administration" replace state={{ section: "utilisateurs" }} />} />
+            <Route path="parametres" element={<Navigate to="/administration" replace state={{ section: "parametres" }} />} />
+            <Route path="objectifs" element={<Objectifs />} />
+            <Route path="demandes" element={<Demandes />} />
+            <Route path="messagerie" element={<Messagerie />} />
+            <Route path="communication" element={<Communication />} />
+            <Route path="administration" element={<Administration />} />
+            <Route path="profil" element={<MonProfil />} />
+            <Route path="aide" element={<Aide />} />
             <Route
               path="*"
               element={

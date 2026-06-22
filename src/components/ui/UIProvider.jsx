@@ -51,7 +51,7 @@ export function UIProvider({ children }) {
       {children}
 
       {/* Notifications */}
-      <div className="fixed bottom-4 right-4 z-[80] space-y-2">
+      <div className="fixed bottom-4 right-4 z-[80] space-y-2" role="status" aria-live="polite" aria-atomic="true">
         {toasts.map((t) => (
           <Toast key={t.id} {...t} />
         ))}

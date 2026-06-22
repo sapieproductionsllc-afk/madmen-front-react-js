@@ -18,7 +18,7 @@ function smoothPath(points) {
   return d.join(" ");
 }
 
-function AreaChart({ data = [], height = 130, color = "#1f4a3a", id = "area", dots = false }) {
+function AreaChart({ data = [], height = 130, color = "#1f4a3a", id = "area", dots = false, animate = false }) {
   // Le tracé ne dépend que de `data` : mémoïsé pour éviter ~80 recalculs SVG
   // pendant le count-up (qui re-rend le parent à ~60 fps).
   const geometry = useMemo(() => {
@@ -50,7 +50,7 @@ function AreaChart({ data = [], height = 130, color = "#1f4a3a", id = "area", do
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
-        <path d={area} fill={`url(#grad-${id})`} />
+        <path d={area} fill={`url(#grad-${id})`} className={animate ? "ac-area" : undefined} />
         <path
           d={line}
           fill="none"
@@ -59,6 +59,8 @@ function AreaChart({ data = [], height = 130, color = "#1f4a3a", id = "area", do
           vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
           strokeLinecap="round"
+          pathLength={animate ? 1 : undefined}
+          className={animate ? "ac-line" : undefined}
         />
       </svg>
       {dots &&
@@ -70,7 +72,7 @@ function AreaChart({ data = [], height = 130, color = "#1f4a3a", id = "area", do
           />
         ))}
       <span
-        className="absolute w-2 h-2 rounded-full"
+        className={`absolute w-2 h-2 rounded-full ${animate ? "ac-dot" : ""}`}
         style={{
           left: `${last[0]}%`,
           top: `${last[1]}%`,

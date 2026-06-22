@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
+import { FilterSelect } from "../components/ui/Input.jsx";
 import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import CarteAnnuaire from "../components/ui/CarteAnnuaire.jsx";
@@ -26,8 +27,7 @@ export default function Employes() {
     });
   }, [q, service, statut]);
 
-  const selectCls =
-    "h-11 rounded-xl bg-surface border border-border text-sm text-muted px-3.5 pr-8 outline-none focus:border-or-500 focus:ring-2 focus:ring-or-500/15 cursor-pointer shadow-soft";
+  const filtreCls = "h-11 rounded-xl bg-surface border border-border text-muted pl-3.5 shadow-soft focus:border-or-500 focus:ring-2 focus:ring-or-500/15";
 
   return (
     <div className="space-y-5 pb-12">
@@ -40,16 +40,16 @@ export default function Employes() {
       {/* Barre d'outils */}
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput value={q} onChange={setQ} placeholder="Rechercher un agent…" className="w-full sm:w-auto sm:flex-1 sm:min-w-[240px]" />
-        <select value={service} onChange={(e) => setService(e.target.value)} className={selectCls} aria-label="Filtrer par service">
+        <FilterSelect value={service} onChange={(e) => setService(e.target.value)} className={filtreCls} aria-label="Filtrer par service">
           {services.map((s) => (
             <option key={s}>{s}</option>
           ))}
-        </select>
-        <select value={statut} onChange={(e) => setStatut(e.target.value)} className={selectCls} aria-label="Filtrer par statut">
+        </FilterSelect>
+        <FilterSelect value={statut} onChange={(e) => setStatut(e.target.value)} className={filtreCls} aria-label="Filtrer par statut">
           {statuts.map((s) => (
             <option key={s}>{s}</option>
           ))}
-        </select>
+        </FilterSelect>
       </div>
 
       {/* Grille annuaire */}

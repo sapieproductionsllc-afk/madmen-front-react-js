@@ -5,6 +5,10 @@ import Avatar from "../ui/Avatar.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { alertes, employes, agencesList } from "../../data/datasets.js";
+import logo from "../../assets/logo.png";
+
+// Photo de l'admin connecté (déterministe par matricule — cohérente avec la page profil).
+const photoAdmin = (u) => `https://i.pravatar.cc/120?u=${encodeURIComponent(u?.matricule || u?.name || "admin")}`;
 
 const iconeAlerte = { Critique: "gpp_bad", Moyen: "warning", Faible: "info" };
 const couleurAlerte = {
@@ -13,7 +17,7 @@ const couleurAlerte = {
   Faible: "bg-slate-50 text-slate-600",
 };
 
-function ItemMenu({ icon, label, onClick, to, danger }) {
+function ItemMenu({ icon, label, onClick, to, state, danger }) {
   const classe = `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
     danger ? "text-rose-600 hover:bg-rose-50" : "text-muted hover:bg-surface-2 hover:text-texte"
   }`;
@@ -25,7 +29,7 @@ function ItemMenu({ icon, label, onClick, to, danger }) {
   );
   if (to)
     return (
-      <Link to={to} onClick={onClick} className={classe}>
+      <Link to={to} state={state} onClick={onClick} className={classe}>
         {contenu}
       </Link>
     );
@@ -106,9 +110,7 @@ export default function TopNav({ onMenuClick }) {
           <Icon name="menu" />
         </button>
         <div className="flex items-center gap-2.5">
-          <span className="w-8 h-8 rounded-xl bg-brand-600 flex items-center justify-center shadow-soft">
-            <Icon name="fingerprint" className="text-canvas text-[18px]" filled />
-          </span>
+          <img src={logo} alt="MADMEN" className="w-9 h-9 object-contain" />
           <span className="text-lg font-bold text-ink tracking-tight hidden sm:inline">MADMEN</span>
         </div>
       </div>
@@ -189,7 +191,7 @@ export default function TopNav({ onMenuClick }) {
             <Icon name="expand_more" className={`text-subtle text-[18px] transition-transform duration-150 ${menu === "agence" ? "rotate-180" : ""}`} />
           </button>
           {menu === "agence" && (
-            <div className="absolute right-0 top-12 w-56 bg-surface border border-border rounded-2xl shadow-pop p-1.5 modal-in">
+            <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-2xl shadow-pop p-1.5 modal-in">
               {["Toutes les agences", ...agencesList].map((a) => (
                 <button
                   key={a}
@@ -219,7 +221,7 @@ export default function TopNav({ onMenuClick }) {
             <Icon name="expand_more" className={`text-[18px] -ml-0.5 transition-transform duration-150 ${menu === "actions" ? "rotate-180" : ""}`} />
           </button>
           {menu === "actions" && (
-            <div className="absolute right-0 top-12 w-56 bg-surface border border-border rounded-2xl shadow-pop p-1.5 modal-in">
+            <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-2xl shadow-pop p-1.5 modal-in">
               {actions.map((a) => (
                 <ItemMenu key={a.label} icon={a.icon} label={a.label} onClick={a.onClick} />
               ))}
@@ -244,7 +246,7 @@ export default function TopNav({ onMenuClick }) {
             )}
           </button>
           {menu === "notif" && (
-            <div className="absolute right-0 top-12 w-80 bg-surface border border-border rounded-2xl shadow-pop overflow-hidden modal-in">
+            <div className="absolute right-0 top-full mt-2 w-80 bg-surface border border-border rounded-2xl shadow-pop overflow-hidden modal-in">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <span className="text-sm font-semibold text-ink tracking-tight">Notifications</span>
                 {nonLues > 0 && (
@@ -281,21 +283,21 @@ export default function TopNav({ onMenuClick }) {
             aria-haspopup="menu"
             aria-expanded={menu === "profil"}
           >
-            <Avatar name={user?.name || "Utilisateur"} size="w-9 h-9" />
+            <Avatar src={photoAdmin(user)} name={user?.name || "Utilisateur"} size="w-9 h-9" />
             <Icon name="expand_more" className={`text-subtle text-[18px] hidden sm:inline transition-transform duration-150 ${menu === "profil" ? "rotate-180" : ""}`} />
           </button>
           {menu === "profil" && (
-            <div className="absolute right-0 top-12 w-60 bg-surface border border-border rounded-2xl shadow-pop p-1.5 modal-in">
+            <div className="absolute right-0 top-full mt-2 w-60 bg-surface border border-border rounded-2xl shadow-pop p-1.5 modal-in">
               <div className="flex items-center gap-3 px-2.5 py-2.5 mb-1 border-b border-border">
-                <Avatar name={user?.name || "Utilisateur"} size="w-9 h-9" />
+                <Avatar src={photoAdmin(user)} name={user?.name || "Utilisateur"} size="w-9 h-9" />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink truncate">{user?.name}</p>
                   <p className="text-xs text-subtle truncate">{user?.role}</p>
                 </div>
               </div>
-              <ItemMenu icon="person" label="Mon profil" onClick={fermer} />
-              <ItemMenu icon="settings" label="Paramètres" to="/parametres" onClick={fermer} />
-              <ItemMenu icon="help" label="Aide & support" onClick={fermer} />
+              <ItemMenu icon="person" label="Mon profil" to="/profil" onClick={fermer} />
+              <ItemMenu icon="settings" label="Paramètres" to="/administration" state={{ section: "parametres" }} onClick={fermer} />
+              <ItemMenu icon="help" label="Aide & support" to="/aide" onClick={fermer} />
               <div className="border-t border-border my-1" />
               <ItemMenu icon="logout" label="Déconnexion" onClick={seDeconnecter} danger />
             </div>

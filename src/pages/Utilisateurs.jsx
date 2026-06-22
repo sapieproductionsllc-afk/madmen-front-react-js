@@ -7,7 +7,7 @@ import Icon from "../components/ui/Icon.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { utilisateurs, roles } from "../data/datasets.js";
 
-export default function Utilisateurs() {
+export default function Utilisateurs({ embedded = false }) {
   const { confirm, toast } = useUI();
 
   const suspendre = (u) =>
@@ -49,15 +49,24 @@ export default function Utilisateurs() {
     },
   ];
 
-  return (
-    <div>
-      <PageHeader title="Utilisateurs & Rôles" subtitle="Comptes, permissions et traçabilité des accès.">
-        <Button icon="person_add" onClick={() => toast("Invitation d'utilisateur ouverte", "info")}>
-          Inviter un utilisateur
-        </Button>
-      </PageHeader>
+  const action = (
+    <Button icon="person_add" onClick={() => toast("Invitation d'utilisateur ouverte", "info")}>
+      Inviter un utilisateur
+    </Button>
+  );
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+  return (
+    <div className={embedded ? "space-y-5" : ""}>
+      {embedded ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-sm text-muted inline-flex items-center gap-2"><Icon name="group" className="text-[16px]" /> {utilisateurs.length} comptes · <span className="text-texte font-medium">{roles.length} rôles</span></p>
+          {action}
+        </div>
+      ) : (
+        <PageHeader title="Utilisateurs & Rôles" subtitle="Comptes, permissions et traçabilité des accès.">{action}</PageHeader>
+      )}
+
+      <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 ${embedded ? "" : "mb-6"}`}>
         {roles.map((r) => (
           <div key={r.name} className="card p-4">
             <div className="flex items-center justify-between mb-2">
