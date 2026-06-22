@@ -60,9 +60,9 @@ function mapProductivite(data) {
   const jours = Number(resume.jours_travailles) || 0;
   return {
     score: Math.round(Number(resume.taux_moyen) || 0),
-    rang: 0, // TODO: endpoint /api/productivite/{id} ne renvoie pas le rang individuel
-    total: 0, // TODO: idem, taille du classement non fournie par /api/productivite/{id}
-    tendance: 0, // TODO: tendance non fournie par /api/productivite/{id}
+    rang: Number(data?.rang) || 0,
+    total: Number(data?.total) || 0,
+    tendance: Number(data?.tendance) || 0,
     tempsMoyen: jours ? hhmmDuree((Number(resume.heures_travaillees) || 0) * 60 / jours) : "—",
     inactivite: jours ? hhmmDuree((Number(resume.heures_inactivite) || 0) * 60 / jours) : "—",
     serie,

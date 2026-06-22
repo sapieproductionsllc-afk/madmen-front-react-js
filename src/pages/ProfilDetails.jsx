@@ -443,7 +443,7 @@ function construireDetail(empApi, documents, histo, sessions, incidents, jour) {
     embauche: dateFr(empApi.created_at),
     urgence:
       empApi.contact_urgence_nom || empApi.contact_urgence_tel
-        ? { nom: empApi.contact_urgence_nom || "—", lien: "Contact d'urgence", tel: empApi.contact_urgence_tel || "—" }
+        ? { nom: empApi.contact_urgence_nom || "—", lien: empApi.contact_urgence_lien || "Contact d'urgence", tel: empApi.contact_urgence_tel || "—" }
         : null,
   };
 

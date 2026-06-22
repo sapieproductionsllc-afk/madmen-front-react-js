@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import { apiGet, apiPost } from "../lib/api.js";
+import { apiGet, apiPost, apiUpload } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -187,14 +187,31 @@ export default function Messagerie({ embedded = false }) {
       toast(e?.message || "Échec de l'envoi", "error");
     }
   }
-  function onFile(e) {
+  async function onFile(e) {
     const f = e.target.files?.[0];
-    if (!f) return;
-    // TODO: endpoint API manquant pour l'upload de fichier (POST /api/fichiers -> fichier_id) ;
-    // l'envoi de pièce jointe nécessite un fichier_id. Affichage local uniquement pour l'instant.
-    ajouter({ de: "moi", type: "document", nom: f.name, taille: `${Math.max(1, Math.round(f.size / 1024))} Ko`, heure: heureNow() });
-    toast(conv?.broadcast ? `Document diffusé à ${employes.length} membres.` : `Document « ${f.name} » envoyé.`, "success");
     e.target.value = "";
+    if (!f || !selectedId) return;
+    // Le canal de diffusion « Tout le personnel » n'accepte que du texte.
+    if (conv?.broadcast) {
+      toast("Les pièces jointes ne sont pas diffusables à tout le personnel.", "info");
+      return;
+    }
+    const emp = employes.find((x) => x.id === selectedId);
+    const c = emp?._id != null ? convDirecteDe(emp._id) : null;
+    if (!c?.id) {
+      toast("Conversation indisponible.", "error");
+      return;
+    }
+    // Affichage optimiste, puis upload réel + message lié au fichier.
+    ajouter({ de: "moi", type: "document", nom: f.name, taille: `${Math.max(1, Math.round(f.size / 1024))} Ko`, heure: heureNow() });
+    try {
+      const up = await apiUpload("/api/fichiers", f); // -> { id, nom_original, mime, taille, url }
+      const type = (f.type || "").startsWith("image/") ? "image" : "document";
+      await apiPost(`/api/conversations/${c.id}/messages`, { type, fichier_id: up.id });
+      toast(`Document « ${f.name} » envoyé.`, "success");
+    } catch (err) {
+      toast(err?.message || "Échec de l'envoi du document", "error");
+    }
   }
   function onKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyer(); }
