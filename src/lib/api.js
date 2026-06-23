@@ -63,13 +63,20 @@ async function request(method, path, body) {
 export const apiGet = (p) => request("GET", p);
 export const apiPost = (p, b) => request("POST", p, b);
 export const apiPut = (p, b) => request("PUT", p, b);
+export const apiPatch = (p, b) => request("PATCH", p, b);
 export const apiDelete = (p) => request("DELETE", p);
 
 // Upload multipart d'une pièce jointe -> { id, nom_original, mime, taille, url }.
 // Pas de Content-Type JSON : le navigateur pose lui-même la frontière multipart.
-export async function apiUpload(path, file, champ = "fichier") {
+// `extra` (optionnel) : champs texte ajoutés au même FormData (ex. titre, type, description).
+export async function apiUpload(path, file, champ = "fichier", extra = null) {
   const fd = new FormData();
   fd.append(champ, file);
+  if (extra && typeof extra === "object") {
+    for (const [k, v] of Object.entries(extra)) {
+      if (v !== undefined && v !== null && v !== "") fd.append(k, v);
+    }
+  }
   const headers = {};
   const tok = getToken();
   if (tok) headers.Authorization = `Bearer ${tok}`;

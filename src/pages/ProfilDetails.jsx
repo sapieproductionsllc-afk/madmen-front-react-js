@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import BandeauAgent from "../components/ui/BandeauAgent.jsx";
+import EditableField from "../components/ui/EditableField.jsx";
+import DocumentsSection from "../components/profil/DocumentsSection.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet } from "../lib/api.js";
+import { apiGet, apiPut, apiPatch, apiUpload } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
+import { fcfa } from "../data/datasets.js";
 
 // Statut API (present/retard/absent/conge) -> statut « live » attendu par le BandeauAgent.
-// L'API n'expose pas de notion de « pause » : aucun agent ne tombera dans "En pause".
 const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé" };
 
 const tonePastille = {
@@ -20,16 +22,38 @@ const tonePastille = {
   slate: "bg-slate-50 text-slate-600",
 };
 
+// ---------------------------------------------------------------- options des selects
+const SEXE_OPTS = [
+  { value: "Homme", label: "Homme" },
+  { value: "Femme", label: "Femme" },
+  { value: "Autre", label: "Autre" },
+];
+const ETAT_CIVIL_OPTS = [
+  { value: "Célibataire", label: "Célibataire" },
+  { value: "Marié(e)", label: "Marié(e)" },
+  { value: "Divorcé(e)", label: "Divorcé(e)" },
+  { value: "Veuf(ve)", label: "Veuf(ve)" },
+];
+const TYPE_CONTRAT_OPTS = [
+  { value: "CDI", label: "CDI" },
+  { value: "CDD", label: "CDD" },
+  { value: "Stage", label: "Stage" },
+  { value: "Intérim", label: "Intérim" },
+  { value: "Freelance", label: "Freelance" },
+];
+const STATUT_OPTS = [
+  { value: "actif", label: "Actif" },
+  { value: "conge", label: "En congé" },
+  { value: "suspendu", label: "Suspendu" },
+];
+
 // ---------------------------------------------------------------- helpers data
-// Date/heure ISO -> "HH:MM" (heure locale du libellé renvoyé par l'API).
 const hhmm = (iso) => (iso ? String(iso).slice(11, 16) : "—");
-// Date ISO -> "JJ/MM/AAAA" pour l'affichage RH.
 function dateFr(iso) {
   if (!iso) return "—";
   const d = String(iso).slice(0, 10).split("-");
   return d.length === 3 ? `${d[2]}/${d[1]}/${d[0]}` : String(iso);
 }
-// Date courte "12 juin" pour les frises/justifications.
 const MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 function dateCourte(iso) {
   if (!iso) return "—";
@@ -37,16 +61,6 @@ function dateCourte(iso) {
   if (p.length !== 3) return String(iso);
   return `${Number(p[2])} ${MOIS_COURTS[Number(p[1]) - 1] ?? p[1]}`;
 }
-// Octets -> libellé lisible (Ko / Mo) ; "—" si inconnu.
-function tailleFr(octets) {
-  if (octets == null) return "—";
-  if (octets >= 1024 * 1024) return `${(octets / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
-  if (octets >= 1024) return `${Math.round(octets / 1024)} Ko`;
-  return `${octets} o`;
-}
-// Type de document RH -> icône Material adaptée.
-const ICONE_DOC = { Contrat: "description", Identité: "badge", Paie: "receipt_long", RH: "edit_document" };
-const iconeDoc = (type) => ICONE_DOC[type] ?? "description";
 // Évènement RH -> icône + teinte de la frise.
 function styleRH(evenement = "") {
   const e = evenement.toLowerCase();
@@ -56,10 +70,10 @@ function styleRH(evenement = "") {
   if (e.includes("embauche") || e.includes("entrée")) return { icon: "person_add", tone: "brand" };
   return { icon: "history", tone: "slate" };
 }
-// Date du jour YYYY-MM-DD (filtrage de l'activité du jour).
 const aujourdHui = () => new Date().toISOString().slice(0, 10);
+// "YYYY-MM-DD..." -> "YYYY-MM-DD" (valeur attendue par <input type="date">).
+const dateInput = (iso) => (iso ? String(iso).slice(0, 10) : "");
 
-// Progression de défilement (repère passif, non cliquable) — écoute le scroller de Layout.
 function useScrollProgress() {
   const [p, setP] = useState(0);
   useEffect(() => {
@@ -78,23 +92,7 @@ function useScrollProgress() {
 
 const prefersReduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-function InfoRow({ icon, label, value, href }) {
-  return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-border last:border-0">
-      <span className="w-8 h-8 rounded-lg bg-surface-2 border border-border flex items-center justify-center shrink-0">
-        <Icon name={icon} className="text-subtle text-[18px]" />
-      </span>
-      <span className="text-sm text-muted w-28 shrink-0">{label}</span>
-      {href ? (
-        <a href={href} className="text-sm text-texte font-medium hover:text-brand-600 truncate">{value}</a>
-      ) : (
-        <span className="text-sm text-texte font-medium truncate">{value}</span>
-      )}
-    </div>
-  );
-}
-
-// Frise HORIZONTALE : nœuds reliés sur une ligne, défile si trop d'étapes (gain de hauteur).
+// Frise HORIZONTALE (Activité / Historique) — INCHANGÉE.
 function Timeline({ items, champTime = "time", champType = "type", champDetail = "detail" }) {
   if (!items.length) {
     return <p className="text-sm text-muted py-4 text-center">Aucune donnée disponible.</p>;
@@ -116,8 +114,8 @@ function Timeline({ items, champTime = "time", champType = "type", champDetail =
   );
 }
 
-// En-tête de carte (rang 3) — unifié sur toute la page.
-function CardHeader({ icon, title, count }) {
+// En-tête de carte (rang 3).
+function CardHeader({ icon, title, count, action }) {
   return (
     <div className="flex items-center gap-2 mb-3.5">
       <span className="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
@@ -125,6 +123,7 @@ function CardHeader({ icon, title, count }) {
       </span>
       <h3 className="text-sm font-semibold text-ink">{title}</h3>
       {count != null && <span className="ml-auto text-xs font-semibold tabular-nums text-muted bg-surface-2 px-2 py-0.5 rounded-full">{count}</span>}
+      {action && <span className="ml-auto">{action}</span>}
     </div>
   );
 }
@@ -134,6 +133,24 @@ function Bloc({ title, icon, count, children }) {
     <div className="card p-5">
       <CardHeader icon={icon} title={title} count={count} />
       {children}
+    </div>
+  );
+}
+
+// Carte d'édition (sous-section du Résumé) : en-tête avec icône « crayon » indicative.
+function EditCard({ icon, title, children }) {
+  return (
+    <div className="card p-5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+          <Icon name={icon} className="text-[18px]" filled />
+        </span>
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
+        <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-subtle">
+          <Icon name="edit" className="text-[14px]" /> Cliquer pour modifier
+        </span>
+      </div>
+      <div>{children}</div>
     </div>
   );
 }
@@ -157,12 +174,9 @@ function Section({ id, icon, title, first, children }) {
 
 const ANCRES = { Résumé: "resume", Pointages: "pointages", Activité: "activite", Documents: "documents", Historique: "historique" };
 
-// Repli vide neutre (jamais de fausses données) en attendant le chargement / si endpoint absent.
 const VIDE = {
-  d: {},
   activite: [],
   actDetail: { connexions: [], deconnexions: [], inactivites: [], justifications: [] },
-  docs: [],
   rh: [],
 };
 
@@ -173,12 +187,15 @@ export default function ProfilDetails() {
   const { toast } = useUI();
   const progress = useScrollProgress();
 
-  // Données RÉELLES de l'API (remplacent intégralement les mocks de profil.js).
-  const [e, setE] = useState(null);
+  const [e, setE] = useState(null); // employé « mappé » (BandeauAgent)
+  const [emp, setEmp] = useState(null); // employé API COMPLET (source des EditableField)
+  const [numericId, setNumericId] = useState(null);
   const [live, setLive] = useState("Absent");
-  const [detail, setDetail] = useState(VIDE); // d / activite / actDetail / docs / rh
+  const [detail, setDetail] = useState(VIDE); // activite / actDetail / rh
+  const [opts, setOpts] = useState({ postes: [], departements: [], superieurs: [] });
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const photoRef = useRef(null);
 
   useEffect(() => {
     let actif = true;
@@ -186,39 +203,54 @@ export default function ProfilDetails() {
     setErreur(null);
     setDetail(VIDE);
 
-    // 1) On résout l'employé via la liste (le param :id est le matricule) pour obtenir
-    //    son id NUMÉRIQUE, requis par les sous-ressources (/employes/{id}/…).
+    // 1) Résolution matricule -> id numérique via la liste, + options des selects.
     Promise.all([apiGet("/api/employes"), apiGet("/api/dashboard/presence")])
-      .then(([employesData, presence]) => {
-        const empApi = (Array.isArray(employesData) ? employesData : []).find((x) => x.matricule === id);
+      .then(async ([employesData, presence]) => {
+        const liste = Array.isArray(employesData) ? employesData : [];
+        const empApi = liste.find((x) => x.matricule === id);
         if (!empApi) {
-          if (actif) {
-            setE(null);
-            setChargement(false);
-          }
+          if (actif) { setE(null); setEmp(null); setChargement(false); }
           return null;
         }
+        const nid = empApi.id;
 
-        const emp = mapEmploye(empApi);
-        const nid = empApi.id; // id numérique pour les appels suivants
-        const ag = (presence?.agents ?? []).find((a) => a.matricule === id || a.id === empApi.id);
+        // Options selects : postes + départements + responsables.
+        const postes = await apiGet("/api/postes").catch(() => null);
+        const departements = await apiGet("/api/departements").catch(() => null);
+        const optionsPostes = Array.isArray(postes) && postes.length
+          ? postes.map((p) => ({ value: String(p.id), label: p.nom || p.intitule || p.code || `Poste ${p.id}` }))
+          : deriverOptions(liste, "poste_id", "poste_libelle");
+        const optionsDeps = Array.isArray(departements) && departements.length
+          ? departements.map((d) => ({ value: String(d.id), label: d.nom || d.libelle || `Département ${d.id}` }))
+          : deriverOptions(liste, "departement_id", "departement_nom");
+        const optionsSup = liste
+          .filter((x) => x.id !== nid)
+          .map((x) => ({ value: String(x.id), label: x.name || `${x.prenom ?? ""} ${x.nom ?? ""}`.trim() || x.matricule }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+
+        // 2) Employé COMPLET (tous les champs, incl. les 7 nouveaux) via GET /api/employes/{id}.
+        const complet = await apiGet(`/api/employes/${nid}`).catch(() => empApi);
+        const source = complet && typeof complet === "object" ? complet : empApi;
+
+        const ag = (presence?.agents ?? []).find((a) => a.matricule === id || a.id === nid);
 
         if (actif) {
-          setE(emp);
+          setNumericId(nid);
+          setEmp(source);
+          setE(mapEmploye(source));
           setLive(ag ? STATUT_LIVE[ag.statut] ?? "Absent" : "Absent");
+          setOpts({ postes: optionsPostes, departements: optionsDeps, superieurs: optionsSup });
         }
 
+        // 3) Sous-ressources Activité / Historique (INCHANGÉES). Documents gérés par <DocumentsSection>.
         const jour = aujourdHui();
-        // 2) Sous-ressources RH/activité de l'agent. `.catch(()=>défaut)` sur chacune :
-        //    une donnée absente -> état vide neutre, sans casser le reste de la page.
         return Promise.all([
-          apiGet(`/api/employes/${nid}/documents`).catch(() => []),
           apiGet(`/api/employes/${nid}/historique-rh`).catch(() => []),
           apiGet(`/api/sessions?employe_id=${nid}`).catch(() => []),
           apiGet(`/api/incidents?employe_id=${nid}&from=${jour}&to=${jour}`).catch(() => []),
-        ]).then(([documents, histo, sessions, incidents]) => {
+        ]).then(([histo, sessions, incidents]) => {
           if (!actif) return;
-          setDetail(construireDetail(empApi, documents, histo, sessions, incidents, jour));
+          setDetail(construireDetail(histo, sessions, incidents, jour));
         });
       })
       .catch((err) => {
@@ -228,12 +260,10 @@ export default function ProfilDetails() {
         if (actif) setChargement(false);
       });
 
-    return () => {
-      actif = false;
-    };
+    return () => { actif = false; };
   }, [id]);
 
-  // Défilement vers la section demandée (ex. arrivée depuis « Voir le détail des pointages »).
+  // Défilement vers la section demandée.
   useEffect(() => {
     const ancre = ANCRES[location.state?.onglet];
     if (!ancre) return;
@@ -243,6 +273,45 @@ export default function ProfilDetails() {
     });
     return () => cancelAnimationFrame(raf);
   }, [location.state, location.pathname, navigate]);
+
+  // ---- Sauvegarde d'un champ employé (PUT partiel) + MAJ optimiste du state ----
+  // Renvoie une promesse : rejette en cas d'échec -> EditableField restaure l'ancienne valeur.
+  const enregistrerChamp = (champ) => async (valeur) => {
+    const payload = { [champ]: normaliser(champ, valeur) };
+    const maj = await apiPut(`/api/employes/${numericId}`, payload);
+    // L'API renvoie l'employé enrichi : on le reprend pour rester cohérent (libellés, etc.).
+    setEmp((prev) => (maj && typeof maj === "object" ? maj : { ...prev, ...payload }));
+    setE((prev) => (maj && typeof maj === "object" ? mapEmploye(maj) : prev));
+  };
+
+  // Matricule / code_pin -> PATCH identifiants (pas PUT).
+  const enregistrerIdentifiant = (champ) => async (valeur) => {
+    await apiPatch(`/api/employes/${numericId}/identifiants`, { [champ]: valeur });
+    if (champ === "matricule") {
+      setEmp((prev) => ({ ...prev, matricule: valeur }));
+      // Le matricule change l'URL (route :id) : on resynchronise.
+      navigate(`/employes/${valeur}/details`, { replace: true });
+    }
+  };
+
+  // Upload photo -> /api/fichiers puis PUT photo_url.
+  const choisirPhoto = async (ev) => {
+    const f = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!f) return;
+    if (!/^image\//.test(f.type)) return toast("Image uniquement (JPG, PNG, WebP).", "error");
+    try {
+      const up = await apiUpload("/api/fichiers", f);
+      const url = up?.url;
+      if (!url) throw new Error("Téléversement sans URL renvoyée");
+      await apiPut(`/api/employes/${numericId}`, { photo_url: url });
+      setEmp((prev) => ({ ...prev, photo_url: url }));
+      setE((prev) => (prev ? { ...prev, photo: url } : prev));
+      toast("Photo mise à jour", "success");
+    } catch (err) {
+      toast(err?.message || "Téléversement de la photo impossible", "error");
+    }
+  };
 
   if (chargement) {
     return (
@@ -265,7 +334,7 @@ export default function ProfilDetails() {
     );
   }
 
-  if (!e) {
+  if (!e || !emp) {
     return (
       <div className="card py-16 text-center max-w-lg mx-auto">
         <Icon name="person_off" className="text-faint text-[40px]" />
@@ -277,7 +346,7 @@ export default function ProfilDetails() {
     );
   }
 
-  const { d, activite, actDetail, docs, rh } = detail;
+  const { activite, actDetail, rh } = detail;
 
   return (
     <div className="space-y-7 pb-12">
@@ -304,28 +373,156 @@ export default function ProfilDetails() {
         plusIcon="event_available"
       />
 
-      {/* ---------- RÉSUMÉ ---------- */}
+      {/* ---------- RÉSUMÉ (éditable inline) ---------- */}
       <Section id="resume" icon="badge" title="Résumé" first>
+        {/* Photo de profil */}
+        <div className="card p-5 flex items-center gap-4">
+          <span className="w-16 h-16 rounded-2xl bg-surface-2 border border-border overflow-hidden flex items-center justify-center shrink-0">
+            {emp.photo_url ? (
+              <img src={emp.photo_url} alt="Photo de l'agent" className="w-full h-full object-cover" />
+            ) : (
+              <Icon name="person" className="text-faint text-[30px]" filled />
+            )}
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">Photo de profil</p>
+            <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={choisirPhoto} />
+            <button
+              type="button"
+              onClick={() => photoRef.current?.click()}
+              className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-2 text-texte border border-border-strong hover:border-or-500/60 hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+            >
+              <Icon name="photo_camera" className="text-[16px]" /> {emp.photo_url ? "Changer la photo" : "Ajouter une photo"}
+            </button>
+            <p className="text-xs text-subtle mt-1.5">JPG, PNG ou WebP.</p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="card p-5">
-            <CardHeader icon="contact_mail" title="Coordonnées" />
-            <InfoRow icon="badge" label="Matricule" value={e.id} />
-            <InfoRow icon="mail" label="Email" value={e.email} href={`mailto:${e.email}`} />
-            <InfoRow icon="call" label="Téléphone" value={e.phone} href={`tel:${e.phone.replace(/\s/g, "")}`} />
-            <InfoRow icon="home" label="Adresse" value={d.adresse ?? "—"} />
-          </div>
-          <div className="card p-5">
-            <CardHeader icon="business_center" title="Affectation & RH" />
-            <InfoRow icon="work" label="Fonction" value={e.fonction} />
-            <InfoRow icon="domain" label="Service" value={e.department} />
-            <InfoRow icon="supervisor_account" label="Manager" value={d.manager ?? "—"} />
-            <InfoRow icon="event" label="Embauche" value={d.embauche ?? "—"} />
-            {d.urgence && <InfoRow icon="emergency" label="Urgence" value={`${d.urgence.nom} (${d.urgence.lien}) · ${d.urgence.tel}`} />}
-          </div>
+          {/* Identité */}
+          <EditCard icon="badge" title="Identité">
+            <EditableField icon="person" label="Nom" value={emp.nom ?? ""} onSave={enregistrerChamp("nom")} />
+            <EditableField icon="person" label="Prénom" value={emp.prenom ?? ""} onSave={enregistrerChamp("prenom")} />
+            <EditableField icon="wc" label="Sexe" type="select" options={SEXE_OPTS} placeholder="Non renseigné" value={emp.sexe ?? ""} onSave={enregistrerChamp("sexe")} />
+            <EditableField icon="cake" label="Naissance" type="date" value={dateInput(emp.date_naissance)} display={() => dateFr(emp.date_naissance)} onSave={enregistrerChamp("date_naissance")} />
+            <EditableField icon="public" label="Nationalité" value={emp.nationalite ?? ""} onSave={enregistrerChamp("nationalite")} />
+            <EditableField icon="favorite" label="État civil" type="select" options={ETAT_CIVIL_OPTS} placeholder="Non renseigné" value={emp.etat_civil ?? ""} onSave={enregistrerChamp("etat_civil")} />
+          </EditCard>
+
+          {/* Identifiants */}
+          <EditCard icon="key" title="Identifiants">
+            <EditableField
+              icon="badge"
+              label="Matricule"
+              value={emp.matricule ?? ""}
+              onSave={enregistrerIdentifiant("matricule")}
+              validate={(v) => (!String(v).trim() ? "Le matricule est obligatoire." : null)}
+            />
+            <EditableField
+              icon="pin"
+              label="Code PIN"
+              type="password"
+              placeholder="4 chiffres"
+              inputMode="numeric"
+              maxLength={4}
+              value=""
+              display={() => "••••"}
+              emptyText="••••"
+              successText="Code PIN mis à jour"
+              onSave={enregistrerIdentifiant("code_pin")}
+              validate={(v) => (/^\d{4}$/.test(String(v)) ? null : "Le code PIN doit contenir exactement 4 chiffres.")}
+            />
+          </EditCard>
+
+          {/* Coordonnées */}
+          <EditCard icon="contact_mail" title="Coordonnées">
+            <EditableField
+              icon="mail"
+              label="Email"
+              type="email"
+              value={emp.email ?? ""}
+              onSave={enregistrerChamp("email")}
+              validate={(v) => (!v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Adresse e-mail invalide.")}
+            />
+            <EditableField icon="call" label="Téléphone" type="tel" value={emp.telephone ?? ""} onSave={enregistrerChamp("telephone")} />
+            <EditableField icon="home" label="Adresse" value={emp.adresse ?? ""} onSave={enregistrerChamp("adresse")} />
+          </EditCard>
+
+          {/* Poste & contrat */}
+          <EditCard icon="business_center" title="Poste & contrat">
+            <EditableField
+              icon="work"
+              label="Poste"
+              type="select"
+              options={opts.postes}
+              placeholder="Non assigné"
+              value={emp.poste_id != null ? String(emp.poste_id) : ""}
+              display={() => emp.poste_libelle || "—"}
+              onSave={enregistrerChamp("poste_id")}
+            />
+            <EditableField
+              icon="domain"
+              label="Département"
+              type="select"
+              options={opts.departements}
+              placeholder="Non assigné"
+              value={emp.departement_id != null ? String(emp.departement_id) : ""}
+              display={() => emp.departement_nom || "—"}
+              onSave={enregistrerChamp("departement_id")}
+            />
+            <EditableField
+              icon="supervisor_account"
+              label="Responsable"
+              type="select"
+              options={opts.superieurs}
+              placeholder="Aucun"
+              value={emp.superieur_id != null ? String(emp.superieur_id) : ""}
+              display={() => emp.manager_nom?.trim() || emp.superieur_nom?.trim() || "—"}
+              onSave={enregistrerChamp("superieur_id")}
+            />
+            <EditableField icon="event" label="Embauche" type="date" value={dateInput(emp.date_embauche)} display={() => dateFr(emp.date_embauche)} onSave={enregistrerChamp("date_embauche")} />
+            <EditableField icon="description" label="Type contrat" type="select" options={TYPE_CONTRAT_OPTS} placeholder="Non renseigné" value={emp.type_contrat ?? ""} onSave={enregistrerChamp("type_contrat")} />
+            <EditableField
+              icon="toggle_on"
+              label="Statut"
+              type="select"
+              options={STATUT_OPTS}
+              value={emp.statut ?? "actif"}
+              display={() => (STATUT_OPTS.find((s) => s.value === emp.statut)?.label ?? emp.statut ?? "—")}
+              onSave={enregistrerChamp("statut")}
+            />
+            <EditableField
+              icon="payments"
+              label="Salaire"
+              type="number"
+              min="0"
+              value={emp.salaire ?? ""}
+              display={() => (emp.salaire != null && emp.salaire !== "" ? fcfa(Number(emp.salaire)) : "—")}
+              onSave={enregistrerChamp("salaire")}
+            />
+          </EditCard>
+
+          {/* Contact d'urgence */}
+          <EditCard icon="emergency" title="Contact d'urgence">
+            <EditableField icon="person" label="Nom" value={emp.contact_urgence_nom ?? ""} onSave={enregistrerChamp("contact_urgence_nom")} />
+            <EditableField icon="diversity_1" label="Lien" value={emp.contact_urgence_lien ?? ""} onSave={enregistrerChamp("contact_urgence_lien")} />
+            <EditableField icon="call" label="Téléphone" type="tel" value={emp.contact_urgence_tel ?? ""} onSave={enregistrerChamp("contact_urgence_tel")} />
+          </EditCard>
+
+          {/* Notes */}
+          <EditCard icon="sticky_note_2" title="Notes administratives">
+            <EditableField
+              label="Notes"
+              type="textarea"
+              placeholder="Notes internes (visibles par l'admin uniquement)…"
+              value={emp.notes_admin ?? ""}
+              onSave={enregistrerChamp("notes_admin")}
+            />
+          </EditCard>
         </div>
       </Section>
 
-      {/* ---------- POINTAGES (bande → feuille de pointage éditable) ---------- */}
+      {/* ---------- POINTAGES (INCHANGÉ) ---------- */}
       <Section id="pointages" icon="fingerprint" title="Pointages">
         <button
           type="button"
@@ -344,7 +541,7 @@ export default function ProfilDetails() {
         </button>
       </Section>
 
-      {/* ---------- ACTIVITÉ ---------- */}
+      {/* ---------- ACTIVITÉ (INCHANGÉ) ---------- */}
       <Section id="activite" icon="bolt" title="Activité du jour">
         <div className="grid grid-cols-2 gap-3 lg:gap-4">
           <Bloc title="Connexions" icon="login" count={actDetail.connexions.length}>
@@ -395,33 +592,12 @@ export default function ProfilDetails() {
         </div>
       </Section>
 
-      {/* ---------- DOCUMENTS ---------- */}
+      {/* ---------- DOCUMENTS (CRUD complet) ---------- */}
       <Section id="documents" icon="folder" title="Documents">
-        {docs.length === 0 ? (
-          <p className="text-sm text-muted">Aucun document disponible.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {docs.map((doc) => (
-              <button
-                key={doc.nom}
-                onClick={() => toast(`Téléchargement de « ${doc.nom} »`, "info")}
-                className="group card card-hover p-4 flex items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-              >
-                <span className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-                  <Icon name={doc.icon} className="text-[22px]" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-ink truncate">{doc.nom}</p>
-                  <p className="text-xs text-subtle">{doc.type} · {doc.date} · {doc.size}</p>
-                </div>
-                <Icon name="download" className="text-subtle group-hover:text-brand-600 text-[20px]" />
-              </button>
-            ))}
-          </div>
-        )}
+        <DocumentsSection numericId={numericId} />
       </Section>
 
-      {/* ---------- HISTORIQUE ---------- */}
+      {/* ---------- HISTORIQUE (INCHANGÉ) ---------- */}
       <Section id="historique" icon="history" title="Historique">
         <div className="card p-5">
           <Timeline items={rh} champTime="date" />
@@ -432,49 +608,44 @@ export default function ProfilDetails() {
   );
 }
 
-// ---------------------------------------------------------------- mapping API
-// Construit la forme EXACTE attendue par le JSX à partir des réponses API.
-function construireDetail(empApi, documents, histo, sessions, incidents, jour) {
-  // Détail RH (Résumé) — issu de /api/employes/{id} (déjà chargé dans la liste enrichie).
-  // sexe/naissance ne sont PAS exposés par l'API -> non affichés ici (le JSX ne les utilise pas).
-  const d = {
-    adresse: empApi.adresse || "—",
-    manager: empApi.manager_nom?.trim() || "—",
-    embauche: dateFr(empApi.created_at),
-    urgence:
-      empApi.contact_urgence_nom || empApi.contact_urgence_tel
-        ? { nom: empApi.contact_urgence_nom || "—", lien: empApi.contact_urgence_lien || "Contact d'urgence", tel: empApi.contact_urgence_tel || "—" }
-        : null,
-  };
+// ---------------------------------------------------------------- helpers métier
 
-  // Documents RH -> { nom, type, date, icon, size } attendu par le JSX.
-  const docs = (Array.isArray(documents) ? documents : []).map((doc) => ({
-    nom: doc.titre,
-    type: doc.type || "RH",
-    date: dateFr(doc.created_at),
-    icon: iconeDoc(doc.type),
-    size: tailleFr(doc.taille_octets),
-  }));
+// Champs numériques/FK -> envoyés comme nombre (ou null si vidés).
+const CHAMPS_NUM = ["poste_id", "departement_id", "superieur_id", "salaire"];
 
-  // Historique RH -> frise { date, type, detail, icon, tone }.
+// Normalise la valeur d'un champ avant PUT.
+//  - vide -> null (les champs sont NULLABLE côté API ; le contrôleur n'altère que les champs fournis) ;
+//  - FK / salaire -> Number ; le reste reste une chaîne nettoyée.
+function normaliser(champ, valeur) {
+  const v = typeof valeur === "string" ? valeur.trim() : valeur;
+  if (v === "" || v == null) return null;
+  if (CHAMPS_NUM.includes(champ)) return Number(v);
+  return v;
+}
+
+// Dérive des options { value, label } depuis la liste d'employés (repli si /api/postes|departements absent).
+function deriverOptions(liste, champId, champLabel) {
+  const m = new Map();
+  for (const x of liste) {
+    if (x[champId] != null && x[champLabel]) m.set(String(x[champId]), x[champLabel]);
+  }
+  return [...m].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+// Construit Activité du jour + Historique RH (DOCUMENTS retirés : gérés par <DocumentsSection>).
+function construireDetail(histo, sessions, incidents, jour) {
   const rh = (Array.isArray(histo) ? histo : []).map((h) => {
     const s = styleRH(h.evenement);
     return { date: dateFr(h.date), type: h.evenement, detail: h.detail || "", icon: s.icon, tone: s.tone };
   });
 
-  // Sessions du jour (connexions/déconnexions) + Journal chronologique du jour.
   const sessionsJour = (Array.isArray(sessions) ? sessions : []).filter(
     (s) => String(s.heure_debut ?? "").slice(0, 10) === jour
   );
   const poste = (s) => (s.poste_travail_id != null ? String(s.poste_travail_id) : "distant");
-  const connexions = sessionsJour
-    .filter((s) => s.heure_debut)
-    .map((s) => ({ time: hhmm(s.heure_debut), poste: poste(s) }));
-  const deconnexions = sessionsJour
-    .filter((s) => s.heure_fin)
-    .map((s) => ({ time: hhmm(s.heure_fin), motif: "Fin de session" }));
+  const connexions = sessionsJour.filter((s) => s.heure_debut).map((s) => ({ time: hhmm(s.heure_debut), poste: poste(s) }));
+  const deconnexions = sessionsJour.filter((s) => s.heure_fin).map((s) => ({ time: hhmm(s.heure_fin), motif: "Fin de session" }));
 
-  // Incidents d'inactivité du jour -> inactivités + justifications (motif renseigné).
   const incJour = Array.isArray(incidents) ? incidents : [];
   const inactivites = incJour.map((i) => ({
     debut: hhmm(i.heure_verrouillage),
@@ -488,35 +659,19 @@ function construireDetail(empApi, documents, histo, sessions, incidents, jour) {
       statut: i.statut === "justifie" ? "Approuvée" : i.statut || "—",
     }));
 
-  // Journal du jour : connexions + déconnexions, classés par heure (frise horizontale).
   const activite = [
     ...sessionsJour.filter((s) => s.heure_debut).map((s) => ({
-      time: hhmm(s.heure_debut),
-      type: "Connexion",
-      detail: `Poste ${poste(s)}`,
-      icon: "login",
-      tone: "emerald",
-      _t: s.heure_debut,
+      time: hhmm(s.heure_debut), type: "Connexion", detail: `Poste ${poste(s)}`, icon: "login", tone: "emerald", _t: s.heure_debut,
     })),
     ...sessionsJour.filter((s) => s.heure_fin).map((s) => ({
-      time: hhmm(s.heure_fin),
-      type: "Déconnexion",
-      detail: `Poste ${poste(s)}`,
-      icon: "logout",
-      tone: "slate",
-      _t: s.heure_fin,
+      time: hhmm(s.heure_fin), type: "Déconnexion", detail: `Poste ${poste(s)}`, icon: "logout", tone: "slate", _t: s.heure_fin,
     })),
     ...incJour.map((i) => ({
-      time: hhmm(i.heure_verrouillage),
-      type: "Inactivité",
-      detail: i.motif || i.justification || "Poste verrouillé",
-      icon: "motion_photos_paused",
-      tone: "amber",
-      _t: i.heure_verrouillage,
+      time: hhmm(i.heure_verrouillage), type: "Inactivité", detail: i.motif || i.justification || "Poste verrouillé", icon: "motion_photos_paused", tone: "amber", _t: i.heure_verrouillage,
     })),
   ]
     .sort((a, b) => String(a._t).localeCompare(String(b._t)))
     .map(({ _t, ...ev }) => ev);
 
-  return { d, activite, actDetail: { connexions, deconnexions, inactivites, justifications }, docs, rh };
+  return { activite, actDetail: { connexions, deconnexions, inactivites, justifications }, rh };
 }
