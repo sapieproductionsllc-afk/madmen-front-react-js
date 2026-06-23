@@ -73,8 +73,10 @@ function BadgeEmploye({ form, photo, empreinteOk, matricule, pin }) {
       </div>
 
       <div className="px-4 pb-4">
-        {/* Photo (chevauche l'en-tête) + identité */}
-        <div className="-mt-6 flex items-center gap-3">
+        {/* Photo (chevauche l'en-tête) + identité.
+            `items-end` : seule la PHOTO remonte dans le teal ; le nom reste sous la ligne
+            de l'en-tête (sinon son haut était rogné par le fond teal sur les noms longs). */}
+        <div className="-mt-6 flex items-end gap-3">
           {photo ? (
             <img src={photo} alt="" className="w-16 h-16 rounded-xl object-cover ring-4 ring-white shrink-0" />
           ) : form.nom.trim() ? (
@@ -86,7 +88,7 @@ function BadgeEmploye({ form, photo, empreinteOk, matricule, pin }) {
               <Icon name="person" className="text-[#A39E90] text-[28px]" />
             </div>
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 pb-0.5">
             <p className="text-[14px] font-medium text-[#2B2A27] truncate leading-tight">{form.nom.trim() || "Nouvel employé"}</p>
             <p className="text-[12px] text-[#6F6B60] truncate">{form.fonction.trim() || "Fonction à définir"}</p>
           </div>
