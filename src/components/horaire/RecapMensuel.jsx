@@ -31,9 +31,6 @@ function deriverRecap(paie) {
   // Secondes -> on convertit en heures pour l'affichage.
   const secTravaille = Number(paie.temps_total_travaille_sec) || 0;
   const secTheorique = Number(paie.temps_theorique_mensuel_sec) || 0;
-  const secSup =
-    Number(paie.temps_heures_sup_sec ?? paie.heures_sup_sec) ||
-    Math.max(0, secTravaille - secTheorique);
 
   // Retenues (retard + absence + manuelles) — même logique que la page Paiement.
   const retenues =
@@ -43,7 +40,6 @@ function deriverRecap(paie) {
 
   return {
     heuresNormalesSec: r?.heures_normales_sec ?? Math.min(secTravaille, secTheorique || secTravaille),
-    heuresSupSec: r?.heures_sup_sec ?? secSup,
     heuresTheoriquesSec: r?.heures_theoriques_sec ?? secTheorique,
     heuresTravailleesSec: r?.heures_travaillees_sec ?? secTravaille,
     presents: r?.jours_present ?? presents,
@@ -112,20 +108,13 @@ export default function RecapMensuel({ paie, moisLabel, onValiderPaie }) {
 
       <div className="p-5 space-y-5">
         {/* Heures */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <CarteStat
             icon="schedule"
             tone="bg-brand-50 border-brand-100 text-brand-700"
             value={dureeH(r.heuresNormalesSec)}
             label="Heures normales"
             sub={`Théorique ${dureeH(r.heuresTheoriquesSec)}`}
-          />
-          <CarteStat
-            icon="more_time"
-            tone="bg-or-100/60 border-or-200 text-or-700"
-            value={dureeH(r.heuresSupSec)}
-            label="Heures sup."
-            sub="Au-delà du théorique"
           />
           <CarteStat
             icon="timer"
