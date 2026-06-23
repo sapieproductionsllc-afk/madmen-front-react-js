@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet, apiPost, apiUpload } from "../lib/api.js";
+import { apiGet, apiPost, apiPut, apiUpload } from "../lib/api.js";
 
 /* ============================================================================
    MADMEN — Enrôlement biométrique (écran « vitrine », brief premium).
@@ -125,6 +125,8 @@ function BadgeEmploye({ form, photo, empreinteOk, matricule, pin }) {
 export default function Enrolement() {
   const { toast } = useUI();
   const navigate = useNavigate();
+  const { id: editId } = useParams(); // présent => mode « Modifier »
+  const editMode = Boolean(editId);
   const [etape, setEtape] = useState(0);
   const [form, setForm] = useState({ nom: "", fonction: "", departement: "", agence: "", email: "", badge: "", pin: "" });
   // poste_id / departement_id sélectionnés (FK envoyées à l'API).
@@ -170,6 +172,30 @@ export default function Enrolement() {
       actif = false;
     };
   }, []);
+
+  // Mode édition : pré-remplit le wizard avec l'employé existant (GET /api/employes/{id}).
+  useEffect(() => {
+    if (!editId) return undefined;
+    let actif = true;
+    apiGet(`/api/employes/${editId}`)
+      .then((e) => {
+        if (!actif || !e) return;
+        setForm((f) => ({
+          ...f,
+          nom: e.name || `${e.prenom ?? ""} ${e.nom ?? ""}`.trim(),
+          fonction: e.poste_libelle || "",
+          departement: e.departement_nom || "",
+          email: e.email || "",
+        }));
+        if (e.poste_id != null) setPosteId(String(e.poste_id));
+        if (e.departement_id != null) setDepartementId(String(e.departement_id));
+        if (e.photo_url) setPhoto(e.photo_url);
+      })
+      .catch(() => toast("Impossible de charger l'employé à modifier", "error"));
+    return () => {
+      actif = false;
+    };
+  }, [editId]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const empreinteOk = captures >= 3;
@@ -220,7 +246,13 @@ export default function Enrolement() {
   };
 
   const etapeValide =
-    etape === 0 ? form.nom.trim() && form.fonction.trim() : etape === 1 ? empreinteOk : etape === 2 ? form.badge.trim() && pinValide : atteste;
+    etape === 0
+      ? form.nom.trim() && form.fonction.trim()
+      : etape === 1
+        ? editMode || empreinteOk // en édition, re-capture d'empreinte facultative
+        : etape === 2
+          ? editMode || (form.badge.trim() && pinValide) // en édition, badge/PIN facultatifs
+          : atteste;
 
   const suivant = () => etapeValide && setEtape((e) => Math.min(e + 1, 3));
   const precedent = () => setEtape((e) => Math.max(e - 1, 0));
@@ -260,22 +292,25 @@ export default function Enrolement() {
       if (form.email.trim()) payload.email = form.email.trim();
       if (photoUrl) payload.photo_url = photoUrl;
 
-      const res = await apiPost("/api/employes", payload);
+      const res = editMode
+        ? await apiPut(`/api/employes/${editId}`, payload)
+        : await apiPost("/api/employes", payload);
+      const empId = res?.id ?? editId;
       setCree(res || {});
 
-      // Enregistre l'empreinte capturée + la pousse au K40 -> l'employé pourra pointer au doigt.
-      if (template && res?.id) {
+      // Enregistre l'empreinte (si re-capturée) + la pousse au K40 -> pointage au doigt.
+      if (template && empId) {
         try {
-          await apiPost(`/api/employes/${res.id}/biometrie`, { type: "empreinte", template, doigt: "index_droit" });
-          await apiPost(`/api/k40/push-user/${res.id}`, {});
+          await apiPost(`/api/employes/${empId}/biometrie`, { type: "empreinte", template, doigt: "index_droit" });
+          await apiPost(`/api/k40/push-user/${empId}`, {});
           await apiPost("/api/k40/push-fingerprints", {});
         } catch {
-          toast("Employé créé — pense à cliquer « Synchroniser le K40 » dans Appareils", "info");
+          toast("Employé enregistré — pense à cliquer « Synchroniser le K40 » dans Appareils", "info");
         }
       }
 
       setDone(true);
-      toast(`${form.nom.trim()} a été enrôlé avec succès`);
+      toast(`${form.nom.trim()} a été ${editMode ? "modifié" : "enrôlé"} avec succès`);
     } catch (err) {
       toast(err?.message || "Échec de la création de l'employé", "error");
     } finally {
@@ -321,7 +356,7 @@ export default function Enrolement() {
               {PuceOr}
               <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#E7C173]">Enrôlement terminé</span>
             </div>
-            <h2 className="text-[24px] font-medium text-white tracking-tight">{form.nom} est enrôlé</h2>
+            <h2 className="text-[24px] font-medium text-white tracking-tight">{form.nom} est {editMode ? "modifié" : "enrôlé"}</h2>
             <p className="text-[13px] text-white/[0.68] mt-1.5">
               Matricule <span className="font-mono text-white">{matricule}</span> · l'employé peut désormais pointer.
             </p>
@@ -374,7 +409,7 @@ export default function Enrolement() {
             {PuceOr}
             <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#E7C173]">Enrôlement biométrique</span>
           </div>
-          <h1 className="text-[28px] sm:text-[32px] font-medium text-white tracking-tight leading-tight">Nouvel employé</h1>
+          <h1 className="text-[28px] sm:text-[32px] font-medium text-white tracking-tight leading-tight">{editMode ? "Modifier l'employé" : "Nouvel employé"}</h1>
           <p className="text-[14px] text-white/[0.68] mt-2 max-w-md">
             Enregistrez l'identité, l'empreinte et les accès en quatre étapes guidées.
           </p>
@@ -650,7 +685,7 @@ export default function Enrolement() {
                 className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[9px] bg-[#1E7D67] text-white text-[13.5px] font-medium shadow-[0_6px_16px_-6px_rgba(30,125,103,0.5)] transition hover:bg-[#1C5C50] active:translate-y-px disabled:bg-[#A39E90] disabled:shadow-none disabled:cursor-not-allowed"
               >
                 <Icon name={enregistre ? "progress_activity" : "check"} className={`text-[16px] ${enregistre ? "animate-spin" : ""}`} aria-hidden="true" />
-                {enregistre ? "Enrôlement en cours…" : "Terminer l'enrôlement"}
+                {enregistre ? "Enregistrement…" : editMode ? "Enregistrer les modifications" : "Terminer l'enrôlement"}
               </button>
             )}
           </div>

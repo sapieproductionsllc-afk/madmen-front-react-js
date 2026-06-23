@@ -49,6 +49,7 @@ export default function App() {
             <Route path="employes/:id/paiement" element={<Paiement />} />
             <Route path="employes/:id/pointages" element={<Pointages />} />
             <Route path="enrolement" element={<Enrolement />} />
+            <Route path="enrolement/:id" element={<Enrolement />} />
             <Route path="postes" element={<Postes />} />
             <Route path="presence" element={<Presence />} />
             <Route path="activite" element={<Activite />} />
