@@ -1,0 +1,20 @@
+# Dashboard MadMen — conteneur statique joignable par le Caddy existant (réseau ssm).
+#   docker compose -f deploy/docker-compose.yml up -d --build
+name: madmen-front
+
+services:
+  front:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://api-madmen.ssmanager.uk
+    image: madmen-front
+    container_name: madmen-front
+    restart: unless-stopped
+    networks: [ssm]
+
+networks:
+  ssm: # réseau du Caddy existant -> Caddy peut joindre 'madmen-front'
+    external: true
+    name: ssm-cloud_ssm
