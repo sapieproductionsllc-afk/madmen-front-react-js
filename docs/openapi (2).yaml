@@ -1,0 +1,1431 @@
+openapi: 3.0.3
+info:
+  title: MadMen API
+  version: 0.1.0
+  description: >
+    API du Module 1 — **Gestion Intelligente des Employés & Contrôle des Postes de Travail**.
+
+    Routes actives : Système (`/`, `/health`), Employés (CRUD complet), Présence,
+    Sessions, Alertes et Tableau de bord. Le « Try it out » de Swagger fonctionne en direct.
+servers:
+  - url: https://api-madmen.ssmanager.uk
+    description: Serveur en ligne (production)
+  - url: http://127.0.0.1:8000
+    description: Serveur de développement local
+
+tags:
+  - name: Authentification
+    description: Connexion dashboard (Matricule + PIN → jeton JWT avec rôle) et RBAC
+  - name: Système
+    description: Santé et métadonnées de l'API
+  - name: Employés
+    description: Enrôlement et gestion des employés
+  - name: Présence
+    description: Pointage biométrique
+  - name: Biométrie
+    description: Enrôlement des empreintes / badges RFID / visages
+  - name: Sessions
+    description: Sessions de travail et surveillance des postes
+  - name: Alertes
+    description: Notifications temps réel aux supérieurs
+  - name: Tableau de bord
+    description: Indicateurs présence / activité / productivité
+  - name: Productivité
+    description: Classement et détail de productivité (interface DG)
+  - name: Pointeuse K40
+    description: Terminal de pointage réseau ZKTeco K40 (arrivée/départ par empreinte)
+  - name: Synchronisation
+    description: Synchro montante offline-first (clients qui rejouent leurs événements bufferisés)
+  - name: Configuration
+    description: Paramètres front et cache hors-ligne des postes
+  - name: Horaires
+    description: Horaire de travail par employé (planning par jour)
+  - name: Paie
+    description: Bulletins et synthèse de paie mensuelle
+  - name: Jours fériés
+    description: Journées payées non comptées comme absence
+  - name: Messagerie
+    description: Communication interne (conversations directes/groupes, pièces jointes)
+  - name: Fichiers
+    description: Pièces jointes de la messagerie (image, audio, PDF, document)
+  - name: Surveillance kiosque
+    description: Journal d'activité du kiosque (sans impact sur la paie)
+
+paths:
+  /:
+    get:
+      tags: [Système]
+      summary: Informations sur l'API
+      responses:
+        '200':
+          description: Métadonnées de l'API
+  /health:
+    get:
+      tags: [Système]
+      summary: Vérifier la connexion à la base de données
+      responses:
+        '200':
+          description: API et DB opérationnelles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  db: { type: string, example: connected }
+
+  /api/employes:
+    get:
+      tags: [Employés]
+      summary: Lister les employés
+      parameters:
+        - { in: query, name: departement_id, schema: { type: integer }, description: Filtrer par département }
+        - { in: query, name: statut, schema: { type: string, enum: [actif, suspendu, conge] } }
+      responses:
+        '200':
+          description: Liste des employés
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Employe' }
+    post:
+      tags: [Employés]
+      summary: Créer un employé (matricule + PIN auto-générés)
+      description: >
+        Seuls `nom` et `prenom` sont requis. Le `matricule` (EMP-NNNN) est généré
+        automatiquement s'il n'est pas fourni, et un code PIN à 4 chiffres UNIQUE est
+        TOUJOURS généré côté serveur. La réponse contient `code_pin_genere` (PIN en clair,
+        affiché une seule fois).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeInput' }
+      responses:
+        '201':
+          description: Employé créé. `code_pin_genere` = le PIN en clair (à noter, non ré-affiché).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Employe'
+                  - type: object
+                    properties:
+                      code_pin_genere: { type: string, example: "8334", description: PIN généré en clair (affiché une seule fois) }
+        '409': { description: PIN déjà partagé par plusieurs comptes, ou collision de matricule }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /api/employes/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Employés]
+      summary: Détail d'un employé
+      responses:
+        '200':
+          description: Employé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employe' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Employés]
+      summary: Mettre à jour un employé
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeInput' }
+      responses:
+        '200':
+          description: Employé mis à jour
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employe' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Employés]
+      summary: Supprimer un employé
+      responses:
+        '204': { description: Supprimé }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/employes/{id}/regenerer-pin:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    post:
+      tags: [Employés]
+      summary: Régénérer le code PIN (cas du PIN oublié)
+      description: Génère un nouveau PIN à 4 chiffres UNIQUE et le renvoie en clair. Réservé au super_admin.
+      responses:
+        '200':
+          description: Nouveau PIN généré
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  matricule: { type: string }
+                  code_pin_genere: { type: string, example: "3876" }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/config/biometrie:
+    get:
+      tags: [Biométrie]
+      summary: Configuration biométrique (pour le front)
+      description: Valeurs non sensibles utilisées par la page d'enrôlement (device, URL du service local, seuil, mode simulation).
+      responses:
+        '200':
+          description: Configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device: { type: string, example: zkteco }
+                  bridge_url: { type: string, example: "http://127.0.0.1:8080" }
+                  samples: { type: integer, example: 3 }
+                  threshold: { type: integer, example: 55 }
+                  template_format: { type: string, example: ansi }
+                  simulation: { type: boolean, example: true }
+
+  /api/employes/{id}/biometrie:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer }, description: ID employé }
+    get:
+      tags: [Biométrie]
+      summary: Lister les biométries enrôlées d'un employé
+      description: Retourne les métadonnées (jamais le gabarit lui-même).
+      responses:
+        '200':
+          description: Liste des enrôlements
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Biométrie]
+      summary: Enrôler une biométrie (empreinte / rfid / facial)
+      description: >
+        La **capture** se fait côté device (front) via le SDK du lecteur, qui produit un
+        gabarit. Le front envoie ce gabarit en base64. L'API le **chiffre (AES-256-GCM)**
+        avant stockage. Pour le type `rfid`, envoyer `badge_rfid` au lieu de `template`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, enum: [empreinte, rfid, facial] }
+                doigt: { type: string, nullable: true, example: index_droit }
+                template: { type: string, description: "Gabarit en base64 (empreinte/facial)", example: "Qk9EWS1URU1QTEFURQ==" }
+                badge_rfid: { type: string, description: "UID du badge (type rfid)", example: "BADGE-0001" }
+      responses:
+        '201': { description: Biométrie enrôlée }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/biometrie/{id}:
+    delete:
+      tags: [Biométrie]
+      summary: Supprimer une biométrie enrôlée
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '204': { description: Supprimée }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/pointages:
+    get:
+      tags: [Présence]
+      summary: Lister les pointages
+      parameters:
+        - { in: query, name: employe_id, schema: { type: integer } }
+        - { in: query, name: date, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Liste des pointages
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Pointage' }
+    post:
+      tags: [Présence]
+      summary: Enregistrer un pointage (arrivée / sortie)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employe_id, methode]
+              properties:
+                employe_id: { type: integer }
+                appareil_id: { type: integer, nullable: true }
+                methode: { type: string, enum: [empreinte, rfid, facial, pin] }
+      responses:
+        '201':
+          description: Pointage enregistré
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pointage' }
+
+  /api/sessions:
+    get:
+      tags: [Sessions]
+      summary: Lister les sessions de travail
+      parameters:
+        - { in: query, name: statut, schema: { type: string, enum: [ouverte, verrouillee, fermee] } }
+      responses:
+        '200':
+          description: Liste des sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SessionTravail' }
+
+  /api/sessions/login:
+    post:
+      tags: [Sessions]
+      summary: Ouvrir une session (Matricule + Code PIN + empreinte)
+      description: >
+        Vérifie le PIN (côté backend), l'autorisation sur le poste, puis ouvre la session.
+        L'empreinte est validée côté device et transmise via `empreinte_ok`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [matricule, code_pin, poste_travail_code]
+              properties:
+                matricule: { type: string, example: EMP-0003 }
+                code_pin: { type: string, example: "1002" }
+                poste_travail_code: { type: string, example: PC-COMP-02 }
+                empreinte_ok: { type: boolean, example: true, description: "Empreinte validée par le lecteur" }
+      responses:
+        '201': { description: Session ouverte }
+        '401': { description: Identifiants invalides }
+        '403': { description: Non autorisé sur ce poste }
+
+  /api/sessions/identifier:
+    post:
+      tags: [Sessions]
+      summary: Ouvrir une session par empreinte (identification 1:N)
+      description: >
+        Connexion sans matricule ni PIN. Le matching réel de gabarits (ANSI/ISO) n'est pas
+        réalisable en PHP pur : il est délégué au service ZKBioOnline / au device, qui résout
+        l'empreinte capturée en un `employe_id`.
+
+
+        - **Mode simulation** (`BIO_SIMULATION=true`) : l'identification est simulée — le backend
+          choisit un employé ayant une empreinte enrôlée active et autorisé sur le poste, puis
+          ouvre la session. La réponse porte `"simulated": true`.
+
+
+        - **Mode réel** (`BIO_SIMULATION=false`) : ZKBioOnline / le device effectue le matching et
+          doit fournir l'`employe_id`. Sans `employe_id`, l'API renvoie `501` (service biométrique requis).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [poste_travail_code]
+              properties:
+                poste_travail_code: { type: string, example: PC-COMP-02 }
+                template:
+                  type: string
+                  description: "Gabarit capturé en base64 (optionnel ; ignoré en simulation)."
+                  example: "QU5TSS1URU1QTEFURQ=="
+                employe_id:
+                  type: integer
+                  description: "Employé résolu par ZKBioOnline/device. Requis en mode réel."
+                  example: 3
+      responses:
+        '201': { description: "Session ouverte. Contient `simulated`, `session` et `employe`." }
+        '404': { description: Poste inconnu, ou aucun employé éligible (simulation) }
+        '422': { description: Champ manquant, ou employé sans empreinte enrôlée }
+        '501': { description: Service biométrique requis (mode réel, employe_id manquant) }
+
+  /api/sessions/{id}/lock:
+    post:
+      tags: [Sessions]
+      summary: Verrouiller la session (inactivité)
+      description: Crée un incident d'inactivité et alerte le supérieur.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Session verrouillée }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/sessions/{id}/unlock:
+    post:
+      tags: [Sessions]
+      summary: Reprendre la session (PIN + motif)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code_pin]
+              properties:
+                code_pin: { type: string, example: "1002" }
+                motif_id: { type: integer, example: 4, description: "Réf. motif_absence" }
+                justification: { type: string, example: "Pause café" }
+      responses:
+        '200': { description: Session reprise }
+        '401': { description: PIN invalide }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/sessions/{id}/logout:
+    post:
+      tags: [Sessions]
+      summary: Fermer la session
+      description: Calcule les durées active/inactive et libère le poste.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Session fermée }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/sessions/{id}/activite:
+    post:
+      tags: [Sessions]
+      summary: Heartbeat de surveillance (échantillon d'activité)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mouvements_souris: { type: integer, example: 320 }
+                frappes_clavier: { type: integer, example: 1200 }
+                app_active: { type: string, example: Excel }
+                niveau_activite: { type: string, enum: [actif, inactif], example: actif }
+      responses:
+        '201': { description: Activité enregistrée }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/alertes:
+    get:
+      tags: [Alertes]
+      summary: Lister les alertes
+      parameters:
+        - { in: query, name: destinataire_id, schema: { type: integer }, description: Supérieur destinataire }
+        - { in: query, name: lu, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Liste des alertes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Alerte' }
+
+  /api/dashboard/presence:
+    get:
+      tags: [Tableau de bord]
+      summary: Résumé présence du jour
+      responses:
+        '200':
+          description: Compteurs de présence
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  presents: { type: integer, example: 42 }
+                  absents: { type: integer, example: 5 }
+                  en_conge: { type: integer, example: 3 }
+                  actifs: { type: integer, example: 38 }
+                  inactifs: { type: integer, example: 4 }
+
+  /api/productivite/classement:
+    get:
+      tags: [Productivité]
+      summary: Classement des employés par productivité
+      description: >
+        Classe les employés selon leur taux de productivité moyen sur la période.
+        Idéal pour le « classement des meilleurs employés » de l'interface DG.
+      parameters:
+        - in: query
+          name: periode
+          schema: { type: string, enum: [mois, trimestre, semestre, tout] }
+          description: Raccourci de période (sinon utiliser from/to)
+        - { in: query, name: from, schema: { type: string, format: date }, description: Date de début }
+        - { in: query, name: to, schema: { type: string, format: date }, description: Date de fin }
+        - { in: query, name: departement_id, schema: { type: integer } }
+        - { in: query, name: limit, schema: { type: integer, default: 20, maximum: 100 } }
+        - { in: query, name: ordre, schema: { type: string, enum: [desc, asc], default: desc } }
+      responses:
+        '200':
+          description: Classement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  periode: { type: string, example: tout }
+                  classement:
+                    type: array
+                    items: { $ref: '#/components/schemas/ClassementLigne' }
+
+  /api/productivite/{id}:
+    get:
+      tags: [Productivité]
+      summary: Détail de productivité d'un employé
+      description: Agrégats + série quotidienne (pour graphiques).
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: query, name: periode, schema: { type: string, enum: [mois, trimestre, semestre, tout] } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Détail productivité
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/auth/login:
+    post:
+      tags: [Authentification]
+      summary: Connexion (Matricule + Code PIN) → jeton JWT
+      description: >
+        Vérifie le matricule + PIN (haché) et renvoie un jeton JWT portant le
+        **rôle** (super_admin / directeur / superviseur / employe). Route publique.
+        Le jeton est ensuite envoyé en `Authorization: Bearer <token>`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [matricule, code_pin]
+              properties:
+                matricule: { type: string, example: EMP-0001 }
+                code_pin: { type: string, example: "1000" }
+      responses:
+        '200':
+          description: Jeton + profil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  employe:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      matricule: { type: string }
+                      nom: { type: string }
+                      prenom: { type: string }
+                      role: { type: string, enum: [super_admin, directeur, superviseur, employe] }
+        '401': { description: Identifiants invalides }
+
+  /api/auth/me:
+    get:
+      tags: [Authentification]
+      summary: Utilisateur courant (depuis le jeton)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Profil courant (id, matricule, role) }
+        '401': { description: Non authentifié }
+
+  /api/sync:
+    post:
+      tags: [Synchronisation]
+      summary: Synchroniser un lot d'événements bufferisés (offline-first)
+      description: >
+        Un client (agent poste, APK, web) renvoie ici les événements créés
+        HORS-LIGNE quand il reconnecte. Chaque événement porte un `client_uuid`
+        (clé UNIQUE) : rejouer le même n'insère pas de doublon (idempotent).
+        Ordre interne : sessions d'abord, puis pointages, puis activités/incidents
+        (qui référencent une session via `session_client_uuid`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, client_uuid]
+                    properties:
+                      type: { type: string, enum: [session, pointage, activite, incident] }
+                      client_uuid: { type: string, format: uuid }
+                      session_client_uuid: { type: string, format: uuid, description: "Pour activite/incident : rattache à une session du lot" }
+                      employe_id: { type: integer }
+                      poste_travail_code: { type: string, example: PC-COMP-02 }
+            example:
+              events:
+                - { type: session, client_uuid: "8f1c...-001", employe_id: 3, poste_travail_code: PC-COMP-02, heure_debut: "2026-06-20 08:00:00", heure_fin: "2026-06-20 17:00:00", statut: fermee }
+                - { type: pointage, client_uuid: "8f1c...-002", employe_id: 3, date: "2026-06-20", heure_entree: "2026-06-20 08:00:00" }
+      responses:
+        '200':
+          description: Résumé de la synchro
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recus: { type: integer, example: 3 }
+                  acceptes: { type: integer, example: 3 }
+                  doublons: { type: integer, example: 0 }
+                  erreurs: { type: array, items: { type: object } }
+                  accepted_uuids: { type: array, items: { type: string } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /iclock/cdata:
+    get:
+      tags: [Pointeuse K40]
+      summary: "[Push/ADMS] Handshake du terminal K40"
+      description: >
+        Mode PUSH (le K40 envoie vers l'API). Le terminal appelle cette route au
+        démarrage ; l'API renvoie ses options (text/plain). Route publique
+        (identifiée par le SN du terminal). Active si `K40_MODE=push|both`.
+      parameters:
+        - { in: query, name: SN, schema: { type: string }, description: Numéro de série du terminal }
+        - { in: query, name: options, schema: { type: string } }
+      responses:
+        '200':
+          description: Options du terminal (text/plain)
+          content:
+            text/plain:
+              schema: { type: string }
+    post:
+      tags: [Pointeuse K40]
+      summary: "[Push/ADMS] Le K40 pousse ses données (pointages)"
+      description: >
+        `table=ATTLOG` : le corps contient les pointages (lignes
+        `userid<TAB>timestamp<TAB>status<TAB>...`). Chaque ligne alimente la table
+        `pointage` (arrivée/départ). Réponse `OK: <n>`.
+      parameters:
+        - { in: query, name: SN, schema: { type: string } }
+        - { in: query, name: table, schema: { type: string, example: ATTLOG } }
+      requestBody:
+        content:
+          text/plain:
+            schema: { type: string, example: "3\t2026-06-20 08:05:00\t0\t1" }
+      responses:
+        '200':
+          description: 'Acquittement text/plain, ex. OK suivi du nombre de lignes'
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /iclock/getrequest:
+    get:
+      tags: [Pointeuse K40]
+      summary: "[Push/ADMS] Le terminal demande des commandes"
+      parameters:
+        - { in: query, name: SN, schema: { type: string } }
+      responses:
+        '200':
+          description: Commandes à exécuter (text/plain, "OK" si aucune)
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /iclock/devicecmd:
+    post:
+      tags: [Pointeuse K40]
+      summary: "[Push/ADMS] Résultat des commandes du terminal"
+      parameters:
+        - { in: query, name: SN, schema: { type: string } }
+      responses:
+        '200':
+          description: Acquittement (text/plain "OK")
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /api/k40/status:
+    get:
+      tags: [Pointeuse K40]
+      summary: Tester la connexion au terminal K40
+      responses:
+        '200':
+          description: État de la connexion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected: { type: boolean, example: false }
+                  ip: { type: string, example: "192.168.1.201" }
+                  port: { type: integer, example: 4370 }
+                  version: { type: string }
+                  error: { type: string }
+
+  /api/k40/sync:
+    post:
+      tags: [Pointeuse K40]
+      summary: Synchroniser les pointages du K40
+      description: >
+        Récupère les transactions du terminal (empreinte), les mappe aux employés
+        (via device_user_id, sinon l'id), et remplit la table pointage (1er punch du
+        jour = arrivée, dernier = départ). Idempotent (état de dernière synchro).
+      responses:
+        '200':
+          description: Résumé de la synchro
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recus: { type: integer, example: 124 }
+                  traites: { type: integer, example: 120 }
+                  ignores: { type: integer, example: 4 }
+                  employes_inconnus: { type: array, items: { type: string } }
+                  derniere_synchro: { type: string, example: "2026-06-19 17:40:00" }
+                  relais:
+                    type: object
+                    description: Résultat du relais vers le cloud (best-effort, n'échoue jamais la synchro locale).
+                    properties:
+                      ok: { type: boolean }
+                      employes: { type: integer }
+                      pointages: { type: integer }
+                      erreur: { type: string }
+        '502': { description: Terminal injoignable ou désactivé }
+
+  /api/gateway/sync:
+    post:
+      tags: [Passerelle cloud]
+      summary: Réception passerelle — le bureau pousse employés + pointages vers le cloud
+      description: >
+        Relais à SENS UNIQUE (bureau -> cloud). La passerelle locale envoie ses employés
+        (upsert par matricule, ne touche jamais PIN/role) et ses pointages quotidiens
+        (référencés par matricule). Authentification par jeton GATEWAY_TOKEN via l'en-tête
+        Authorization: Bearer <token> (exemptée de l'auth JWT). Idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                employes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      matricule: { type: string, example: "ADMIN-001" }
+                      nom: { type: string }
+                      prenom: { type: string }
+                      email: { type: string, nullable: true }
+                      statut: { type: string, example: "actif" }
+                pointages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      matricule: { type: string, example: "ADMIN-001" }
+                      date: { type: string, example: "2026-06-23" }
+                      heure_entree: { type: string, nullable: true }
+                      heure_sortie: { type: string, nullable: true }
+                      retard_minutes: { type: integer }
+                      temps_present_minutes: { type: integer }
+                      temps_pause_minutes: { type: integer }
+                      nb_pauses: { type: integer }
+                      statut: { type: string, example: "present" }
+      responses:
+        '200':
+          description: Compte des éléments reçus / appliqués
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  employes_recus: { type: integer }
+                  employes_appliques: { type: integer }
+                  pointages_recus: { type: integer }
+                  pointages_appliques: { type: integer }
+        '401': { description: Jeton passerelle invalide }
+
+  /api/k40/users:
+    get:
+      tags: [Pointeuse K40]
+      summary: Lister les utilisateurs enregistrés sur le terminal
+      responses:
+        '200': { description: Liste des utilisateurs du K40 }
+        '502': { description: Terminal injoignable }
+
+  /api/k40/push-user/{id}:
+    post:
+      tags: [Pointeuse K40]
+      summary: Envoyer un employé vers le terminal K40
+      description: Crée l'utilisateur sur le K40 (userid = device_user_id ou id de l'employé).
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Employé envoyé }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { description: Terminal injoignable }
+
+  /api/k40/push-all:
+    post:
+      tags: [Pointeuse K40]
+      summary: Pousser tous les employés vers le K40 (une seule connexion)
+      responses:
+        '200': { description: Push groupé effectué }
+        '502': { description: Terminal injoignable }
+  /api/k40/clear-users:
+    post:
+      tags: [Pointeuse K40]
+      summary: Effacer tous les utilisateurs du terminal K40
+      responses:
+        '200': { description: Terminal vidé }
+        '502': { description: Terminal injoignable }
+  /api/k40/push-fingerprints:
+    post:
+      tags: [Pointeuse K40]
+      summary: Pousser les empreintes vers le K40 (pont Python pyzk)
+      responses:
+        '200': { description: Empreintes envoyées }
+        '502': { description: Terminal injoignable }
+  /api/k40/users/{id}:
+    delete:
+      tags: [Pointeuse K40]
+      summary: Retirer un utilisateur du terminal K40
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Utilisateur retiré }
+        '502': { description: Terminal injoignable }
+
+  /api/sessions/{id}:
+    get:
+      tags: [Sessions]
+      summary: État d'une session (le poste poll pour détecter un verrouillage forcé)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Session }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/sessions/login-pin:
+    post:
+      tags: [Sessions]
+      summary: Connexion au poste par PIN seul (kiosque)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code_pin, poste_travail_code]
+              properties:
+                code_pin: { type: string, example: "1234" }
+                poste_travail_code: { type: string, example: PC-DIR-01 }
+                empreinte_ok: { type: boolean, default: false }
+      responses:
+        '201': { description: Session ouverte }
+        '401': { description: Identifiants invalides }
+        '403': { description: Non autorisé sur ce poste }
+        '429': { description: Trop de tentatives }
+
+  /api/motifs:
+    get:
+      tags: [Sessions]
+      summary: Motifs d'absence / justification disponibles
+      responses:
+        '200': { description: Liste des motifs }
+  /api/incidents:
+    get:
+      tags: [Sessions]
+      summary: Incidents d'inactivité (verrouillages)
+      responses:
+        '200': { description: Liste des incidents }
+
+  /api/config/postes:
+    get:
+      tags: [Configuration]
+      summary: Paramètres des postes (seuils inactivité/justification, heartbeat)
+      responses:
+        '200': { description: Configuration des postes }
+
+  /api/postes:
+    get:
+      tags: [Postes]
+      summary: Lister les postes de travail
+      responses:
+        '200':
+          description: Liste des postes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: integer }
+                    code: { type: string, example: PC-01 }
+                    nom: { type: string, example: Accueil }
+                    statut: { type: string, enum: [libre, occupe, verrouille, hors_ligne] }
+                    adresse_ip: { type: string, nullable: true }
+                    departement_id: { type: integer, nullable: true }
+                    created_at: { type: string }
+    post:
+      tags: [Postes]
+      summary: Créer un poste de travail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, example: PC-01, description: "Code unique (doit correspondre au kiosque)" }
+                nom: { type: string, example: Accueil }
+                adresse_ip: { type: string, example: "192.168.1.50" }
+                adresse_mac: { type: string }
+                departement_id: { type: integer }
+      responses:
+        '201': { description: Poste créé }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /api/postes/{code}/roster:
+    get:
+      tags: [Configuration]
+      summary: Cache hors-ligne d'un poste (employés autorisés + PIN hachés)
+      parameters:
+        - { in: path, name: code, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Roster du poste }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/employes/{id}/horaire:
+    get:
+      tags: [Horaires]
+      summary: Horaire de travail d'un employé (planning par jour)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Horaire de l'employé }
+    put:
+      tags: [Horaires]
+      summary: Définir / mettre à jour l'horaire d'un employé
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tolerance_minutes: { type: integer, example: 10 }
+                planning:
+                  type: object
+                  description: "Map jourISO(1-7) -> {debut,fin} ; jour absent = repos"
+                  example: { "1": { debut: "08:30", fin: "18:00" }, "6": { debut: "08:00", fin: "12:00" } }
+      responses:
+        '200': { description: Horaire enregistré }
+
+  /api/employes/{id}/pointage-manuel:
+    post:
+      tags: [Présence]
+      summary: Saisie manuelle d'un pointage (admin)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '201': { description: Pointage créé }
+  /api/pointages/{id}/passages:
+    get:
+      tags: [Présence]
+      summary: Détail des allers-retours du jour (entrées/sorties, multi-pauses)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Liste des passages }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/heures-supplementaires:
+    get:
+      tags: [Présence]
+      summary: Heures supplémentaires enregistrées
+      responses:
+        '200': { description: Liste }
+
+  /api/paie:
+    get:
+      tags: [Paie]
+      summary: Synthèse de paie de tous les employés actifs
+      parameters:
+        - { in: query, name: mois, schema: { type: string, example: "2026-06" } }
+      responses:
+        '200': { description: Liste de paie }
+        '403': { description: Rôle insuffisant (directeur min.) }
+  /api/employes/{id}/paie:
+    get:
+      tags: [Paie]
+      summary: Bulletin de paie détaillé d'un employé
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: query, name: mois, schema: { type: string, example: "2026-06" } }
+      responses:
+        '200': { description: Bulletin de paie }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/jours-feries:
+    get:
+      tags: [Jours fériés]
+      summary: Liste des jours fériés
+      responses:
+        '200': { description: Liste }
+    post:
+      tags: [Jours fériés]
+      summary: Ajouter un jour férié (super_admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, libelle]
+              properties:
+                date: { type: string, format: date }
+                libelle: { type: string, example: "Fête du Travail" }
+      responses:
+        '201': { description: Créé }
+  /api/jours-feries/{id}:
+    delete:
+      tags: [Jours fériés]
+      summary: Supprimer un jour férié (super_admin)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Supprimé }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/kiosque-activite:
+    get:
+      tags: [Surveillance kiosque]
+      summary: Journal d'activité du kiosque (temps actif/inactif, motifs) — sans impact paie
+      parameters:
+        - { in: query, name: employe_id, schema: { type: integer } }
+        - { in: query, name: date, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Journal d'activité }
+
+  /api/conversations:
+    get:
+      tags: [Messagerie]
+      summary: Mes conversations (dernier message + non-lus)
+      responses:
+        '200': { description: Liste des conversations }
+    post:
+      tags: [Messagerie]
+      summary: Créer une conversation (directe ou groupe)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [membres]
+              properties:
+                type: { type: string, enum: [direct, groupe], default: direct }
+                nom: { type: string, description: "Obligatoire pour un groupe" }
+                membres: { type: array, items: { type: integer } }
+      responses:
+        '201': { description: Conversation créée }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /api/conversations/{id}:
+    get:
+      tags: [Messagerie]
+      summary: Détail d'une conversation + membres
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Conversation }
+        '403': { description: Non membre de la conversation }
+  /api/conversations/{id}/membres:
+    post:
+      tags: [Messagerie]
+      summary: Ajouter des membres (groupe, admin)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                membres: { type: array, items: { type: integer } }
+      responses:
+        '200': { description: Membres ajoutés }
+  /api/conversations/{id}/membres/{employeId}:
+    delete:
+      tags: [Messagerie]
+      summary: Retirer un membre / quitter la conversation
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: path, name: employeId, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Membre retiré }
+  /api/conversations/{id}/messages:
+    get:
+      tags: [Messagerie]
+      summary: Historique des messages (paginé)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: query, name: before, schema: { type: integer } }
+        - { in: query, name: limit, schema: { type: integer, default: 50 } }
+      responses:
+        '200': { description: Messages }
+    post:
+      tags: [Messagerie]
+      summary: Envoyer un message (texte ou pièce jointe)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type: { type: string, enum: [texte, image, audio, document, fichier], default: texte }
+                contenu: { type: string }
+                fichier_id: { type: integer, description: "Requis si type != texte" }
+                client_uuid: { type: string, description: "Idempotence offline-first" }
+      responses:
+        '201': { description: Message envoyé }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /api/conversations/{id}/lu:
+    post:
+      tags: [Messagerie]
+      summary: Marquer comme lu (jusqu'au dernier ou message_id)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Marqué comme lu }
+  /api/messages/{id}:
+    delete:
+      tags: [Messagerie]
+      summary: Supprimer son propre message
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Message supprimé }
+        '403': { description: Pas l'auteur du message }
+
+  /api/fichiers:
+    post:
+      tags: [Fichiers]
+      summary: Téléverser une pièce jointe (multipart, champ « fichier »)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                fichier: { type: string, format: binary }
+      responses:
+        '201': { description: Fichier téléversé }
+        '415': { description: Type de fichier non autorisé }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /api/fichiers/{id}:
+    get:
+      tags: [Fichiers]
+      summary: Télécharger une pièce jointe (réservé aux membres de la conversation)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Binaire du fichier }
+        '403': { description: Accès refusé }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # === Intégration dashboard React — ressources additives (cf. docs/INTEGRATION-FRONT.md) ===
+  /api/depenses:
+    get:
+      tags: [Finance]
+      summary: Dépenses société (filtre ?periode=YYYY-MM)
+      responses: { '200': { description: Liste des dépenses } }
+    post:
+      tags: [Finance]
+      summary: Créer une dépense
+      responses: { '201': { description: Dépense créée }, '422': { description: Validation } }
+  /api/depenses/{id}:
+    delete:
+      tags: [Finance]
+      summary: Supprimer une dépense
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '204': { description: Supprimée }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/paie/{employe_id}/payer:
+    post:
+      tags: [Paie]
+      summary: Marquer la paie d'un employé comme payée
+      parameters: [{ in: path, name: employe_id, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Paiement enregistré } }
+  /api/paie/payer-lot:
+    post:
+      tags: [Paie]
+      summary: Payer plusieurs employés en lot
+      responses: { '200': { description: Paiements enregistrés } }
+  /api/mouvements:
+    get:
+      tags: [Finance]
+      summary: Journal des paiements (?periode=)
+      responses: { '200': { description: Mouvements } }
+  /api/finance/synthese:
+    get:
+      tags: [Finance]
+      summary: Synthèse financière (courant/précédent + delta)
+      responses: { '200': { description: Synthèse } }
+  /api/employes/{id}/ajustements:
+    get:
+      tags: [Paie]
+      summary: Primes/retenues d'un employé (?periode=YYYY-MM)
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Ajustements } }
+    post:
+      tags: [Paie]
+      summary: Ajouter une prime ou une retenue
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '201': { description: Créé }, '422': { description: Validation } }
+  /api/ajustements/{id}:
+    delete:
+      tags: [Paie]
+      summary: Supprimer un ajustement
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '204': { description: Supprimé }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/parametres:
+    get:
+      tags: [Configuration]
+      summary: Paramètres globaux de l'entreprise
+      responses: { '200': { description: Paramètres } }
+    put:
+      tags: [Configuration]
+      summary: Mettre à jour des paramètres (upsert clé/valeur)
+      responses: { '200': { description: Paramètres à jour } }
+  /api/utilisateurs:
+    get:
+      tags: [Administration]
+      summary: Comptes du dashboard (lecture depuis employe)
+      responses: { '200': { description: Comptes } }
+  /api/roles:
+    get:
+      tags: [Administration]
+      summary: Rôles distincts avec comptage
+      responses: { '200': { description: Rôles } }
+  /api/appareils:
+    get:
+      tags: [Biométrie]
+      summary: Liste des appareils biométriques
+      responses: { '200': { description: Appareils } }
+  /api/appareils/{id}:
+    get:
+      tags: [Biométrie]
+      summary: Détail d'un appareil
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Appareil }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/rapports/synthese:
+    get:
+      tags: [Rapports]
+      summary: Agrégats (présence, donut, tendance, temps écran)
+      responses: { '200': { description: Synthèse } }
+  /api/rapports/export:
+    get:
+      tags: [Rapports]
+      summary: Export HTML imprimable (PDF navigateur)
+      responses: { '200': { description: Document HTML } }
+  /api/presence/temps-reel:
+    get:
+      tags: [Présence]
+      summary: Statut temps réel par agent (En activité/En pause/Absent/Congé)
+      responses: { '200': { description: Statuts live } }
+  /api/employes/{id}/presence:
+    get:
+      tags: [Présence]
+      summary: Calendrier de présence d'un agent (?mois=YYYY-MM)
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '200': { description: États par jour }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/employes/{id}/documents:
+    get:
+      tags: [Employés]
+      summary: Documents RH d'un employé
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Documents }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/employes/{id}/historique-rh:
+    get:
+      tags: [Employés]
+      summary: Historique RH d'un employé
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Historique }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/productivite/global:
+    get:
+      tags: [Productivité]
+      summary: Agrégat de productivité entreprise (value, series, weeklyGrowth)
+      responses: { '200': { description: Productivité globale } }
+  /api/alertes/{id}/lu:
+    post:
+      tags: [Alertes]
+      summary: Marquer une alerte comme lue
+      parameters: [{ in: path, name: id, required: true, schema: { type: integer } }]
+      responses: { '204': { description: Marquée lue }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/alertes/tout-lire:
+    post:
+      tags: [Alertes]
+      summary: Marquer toutes les alertes comme lues
+      responses: { '200': { description: Marquées } }
+  /api/demandes:
+    get:
+      tags: [Demandes]
+      summary: Liste des demandes pour validation (manager) — ?statut=&employe_id=
+      responses: { '200': { description: Demandes } }
+    post:
+      tags: [Demandes]
+      summary: Créer une demande AU NOM d'un agent (manager) — employe_id requis
+      responses: { '201': { description: Créée }, '422': { description: Validation } }
+  /api/conversations/broadcast:
+    post:
+      tags: [Messagerie]
+      summary: Diffusion « Tout le personnel » (canal annonce)
+      responses: { '201': { description: Annonce créée }, '422': { description: Validation } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Clé API statique. Requise sur les routes `/api/*` quand `AUTH_ENABLED=true`
+        (en-tête `Authorization: Bearer <API_KEY>`). Routes publiques :
+        `/`, `/health`, `/docs`, `/openapi.yaml` et `/iclock/*` (protocole terminal).
+  responses:
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Données invalides
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: "Not Found" }
+
+    ClassementLigne:
+      type: object
+      properties:
+        rang: { type: integer, example: 1 }
+        id: { type: integer, example: 11 }
+        matricule: { type: string, example: EMP-0011 }
+        nom: { type: string, example: Paul Garnier }
+        departement: { type: string, example: Ressources Humaines }
+        taux_moyen: { type: number, format: float, example: 95.6 }
+        heures_travaillees: { type: number, format: float, example: 1045.9 }
+        heures_inactivite: { type: number, format: float, example: 78.4 }
+        retard_total_min: { type: integer, example: 1241 }
+        total_arrets: { type: integer, example: 210 }
+        jours_travailles: { type: integer, example: 123 }
+
+    Departement:
+      type: object
+      properties:
+        id: { type: integer }
+        nom: { type: string, example: Comptabilité }
+        code: { type: string, nullable: true, example: COMP }
+
+    Poste:
+      type: object
+      properties:
+        id: { type: integer }
+        intitule: { type: string, example: Comptable }
+        departement_id: { type: integer, nullable: true }
+
+    Employe:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        matricule: { type: string, example: EMP-0001 }
+        nom: { type: string, example: Dupont }
+        prenom: { type: string, example: Jean }
+        photo_url: { type: string, nullable: true }
+        poste_id: { type: integer, nullable: true }
+        departement_id: { type: integer, nullable: true }
+        superieur_id: { type: integer, nullable: true }
+        telephone: { type: string, nullable: true }
+        adresse: { type: string, nullable: true }
+        contact_urgence_nom: { type: string, nullable: true }
+        contact_urgence_tel: { type: string, nullable: true }
+        salaire: { type: number, format: float, nullable: true, example: 3500.00 }
+        statut: { type: string, enum: [actif, suspendu, conge], example: actif }
+        created_at: { type: string, format: date-time }
+
+    EmployeInput:
+      type: object
+      required: [matricule, nom, prenom, code_pin]
+      properties:
+        matricule: { type: string, example: EMP-0001 }
+        nom: { type: string, example: Dupont }
+        prenom: { type: string, example: Jean }
+        photo_url: { type: string, nullable: true }
+        poste_id: { type: integer, nullable: true }
+        departement_id: { type: integer, nullable: true }
+        superieur_id: { type: integer, nullable: true }
+        telephone: { type: string, nullable: true }
+        adresse: { type: string, nullable: true }
+        contact_urgence_nom: { type: string, nullable: true }
+        contact_urgence_tel: { type: string, nullable: true }
+        salaire: { type: number, format: float, nullable: true }
+        code_pin: { type: string, description: "PIN en clair — sera haché côté serveur", example: "1234" }
+        statut: { type: string, enum: [actif, suspendu, conge], default: actif }
+
+    Pointage:
+      type: object
+      properties:
+        id: { type: integer }
+        employe_id: { type: integer }
+        appareil_id: { type: integer, nullable: true }
+        date: { type: string, format: date }
+        heure_entree: { type: string, format: date-time, nullable: true }
+        heure_sortie: { type: string, format: date-time, nullable: true }
+        methode: { type: string, enum: [empreinte, rfid, facial, pin] }
+        retard_minutes: { type: integer, example: 0 }
+        statut: { type: string, enum: [present, absent, retard, conge] }
+
+    SessionTravail:
+      type: object
+      properties:
+        id: { type: integer }
+        employe_id: { type: integer }
+        poste_travail_id: { type: integer }
+        heure_debut: { type: string, format: date-time }
+        heure_fin: { type: string, format: date-time, nullable: true }
+        statut: { type: string, enum: [ouverte, verrouillee, fermee] }
+        duree_active_sec: { type: integer }
+        duree_inactive_sec: { type: integer }
+
+    Alerte:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [inactivite, retard, absence, deconnexion, connexion_refusee] }
+        employe_id: { type: integer, nullable: true }
+        poste_travail_id: { type: integer, nullable: true }
+        destinataire_id: { type: integer, nullable: true }
+        message: { type: string, example: "Inactivité détectée — Pause café (7 min)" }
+        horodatage: { type: string, format: date-time }
+        lu: { type: boolean, example: false }
