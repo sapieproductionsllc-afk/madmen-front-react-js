@@ -74,6 +74,7 @@ function construireCalendrier(paie) {
 
     let etat = null; // "Présent" | "Retard" | "Absent" | "Prévu"
     let arrivee = null;
+    let depart = null;
     let retardMin = 0;
 
     if (cours) {
@@ -83,6 +84,7 @@ function construireCalendrier(paie) {
         etat = ETAT_API[det.status];
         if (det.status === "PRESENT" || det.status === "LATE") {
           arrivee = hhmm(det.check_in);
+          depart = hhmm(det.check_out); // heure de départ (sortie K40)
           retardMin = Math.round((Number(det.late_seconds) || 0) / 60);
           joursPointes++;
         }
@@ -94,7 +96,7 @@ function construireCalendrier(paie) {
       }
     }
 
-    jours.push({ jour: d, dow, weekend, ferie, event, cours, futur, today: d === todayJour, etat, arrivee, retardMin });
+    jours.push({ jour: d, dow, weekend, ferie, event, cours, futur, today: d === todayJour, etat, arrivee, depart, retardMin });
   }
 
   const heuresPlanifiees = (Number(paie?.temps_theorique_mensuel_sec) || 0) / 3600;
@@ -248,7 +250,13 @@ export default function ProfilEmploye() {
       {/* Calendrier de présence */}
       <CalendrierPresence
         cal={calAffiche}
-        onJour={(j) => toast(`Journée du ${j.jour} ${calAffiche.mois.split(" ")[0].toLowerCase()} — ${j.ferie ?? j.event ?? (j.etat === "Prévu" ? "à pointer" : j.etat) ?? "repos"}`, "info")}
+        onJour={(j) => {
+          const base = j.ferie ?? j.event ?? (j.etat === "Prévu" ? "à pointer" : j.etat) ?? "repos";
+          const horaires = j.arrivee
+            ? ` · arrivée ${j.arrivee}${j.depart ? ` → départ ${j.depart}` : " · pas encore reparti"}`
+            : "";
+          toast(`Journée du ${j.jour} ${calAffiche.mois.split(" ")[0].toLowerCase()} — ${base}${horaires}`, "info");
+        }}
       />
 
       {/* Bande pointages → feuille de pointage éditable (admin) */}

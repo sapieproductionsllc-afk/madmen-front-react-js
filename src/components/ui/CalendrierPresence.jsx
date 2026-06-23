@@ -24,7 +24,7 @@ function Cellule({ j, onJour }) {
   return (
     <button
       onClick={() => onJour?.(j)}
-      aria-label={`${WEEKDAYS[j.dow]} ${j.jour} juin — ${libelleJour(j)}${j.arrivee ? `, arrivée ${j.arrivee}` : ""}`}
+      aria-label={`${WEEKDAYS[j.dow]} ${j.jour} juin — ${libelleJour(j)}${j.arrivee ? `, arrivée ${j.arrivee}` : ""}${j.depart ? `, départ ${j.depart}` : ""}`}
       className={`relative rounded-xl min-h-[86px] p-2 flex flex-col text-left transition-all hover:-translate-y-px hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${bg} ${
         j.today ? "ring-2 ring-or-400" : "ring-1 ring-border/50"
       }`}
@@ -44,9 +44,16 @@ function Cellule({ j, onJour }) {
             <Icon name="event" className="text-[12px] shrink-0" /> {j.event}
           </span>
         ) : st ? (
-          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold tabular-nums ${st.chip}`}>
-            <Icon name={st.icon} className="text-[12px]" /> {j.arrivee ?? j.etat}
-          </span>
+          <div className="flex flex-col gap-0.5 items-start">
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold tabular-nums ${st.chip}`}>
+              <Icon name={st.icon} className="text-[12px]" /> {j.arrivee ?? j.etat}
+            </span>
+            {j.depart && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-muted tabular-nums pl-0.5" title="Heure de départ">
+                <Icon name="logout" className="text-[11px]" /> {j.depart}
+              </span>
+            )}
+          </div>
         ) : j.etat === "Prévu" ? (
           <span className="inline-flex items-center gap-1 text-[10.5px] text-muted">
             <span className="w-2 h-2 rounded-full border border-faint" /> À pointer
@@ -84,7 +91,11 @@ function LigneJour({ j, onJour }) {
         </span>
       ) : null}
       <span className="flex-1 text-sm text-texte truncate">{libelle}</span>
-      {j.arrivee && <span className="font-mono text-sm text-muted shrink-0">{j.arrivee}</span>}
+      {j.arrivee && (
+        <span className="font-mono text-xs text-muted shrink-0 text-right tabular-nums">
+          {j.arrivee}{j.depart ? ` → ${j.depart}` : ""}
+        </span>
+      )}
     </button>
   );
 }
