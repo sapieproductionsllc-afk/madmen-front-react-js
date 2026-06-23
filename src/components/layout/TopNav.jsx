@@ -4,7 +4,6 @@ import Icon from "../ui/Icon.jsx";
 import Avatar from "../ui/Avatar.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { agencesList } from "../../data/datasets.js";
 import { apiGet, apiPost } from "../../lib/api.js";
 import { mapEmploye } from "../../lib/mappers.js";
 import logo from "../../assets/logo.png";
@@ -71,7 +70,7 @@ function ItemMenu({ icon, label, onClick, to, state, danger }) {
 }
 
 export default function TopNav({ onMenuClick }) {
-  const { openAddEmployee, agence, setAgence, toast, refreshData, dataVersion } = useUI();
+  const { toast, refreshData, dataVersion } = useUI();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menu, setMenu] = useState(null); // "notif" | "profil" | "actions" | "agence"
@@ -83,9 +82,12 @@ export default function TopNav({ onMenuClick }) {
   const [alertes, setAlertes] = useState([]);
   const [employes, setEmployes] = useState([]);
   const [sync, setSync] = useState(false);
-  const [autoSync, setAutoSync] = useState(true); // auto-synchro K40 toutes les 5 s
+  const [autoSync, setAutoSync] = useState(true); // auto-synchro K40 toutes les 10 s
   const [lastSync, setLastSync] = useState(null);
+  const [compteur, setCompteur] = useState(10); // décompte (s) avant la prochaine synchro
+  const [etatSync, setEtatSync] = useState(null); // 'ok' | 'echec' : résultat de la dernière synchro
   const syncingRef = useRef(false); // garde anti-chevauchement (manuel + auto)
+  const tickRef = useRef(10);
 
   // Raccourci Ctrl/⌘ + K
   useEffect(() => {
@@ -128,28 +130,24 @@ export default function TopNav({ onMenuClick }) {
   const resEmployes = q
     ? employes.filter((e) => e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) || e.fonction.toLowerCase().includes(q)).slice(0, 5)
     : [];
-  const resAgences = q ? agencesList.filter((a) => a.toLowerCase().includes(q)).slice(0, 3) : [];
-  const aResultats = resEmployes.length + resAgences.length > 0;
-
-  const choisirAgence = (a) => {
-    setAgence(a);
-    fermer();
-    toast(`Vue filtrée sur : ${a}`, "info");
-  };
+  const aResultats = resEmployes.length > 0;
 
   // Cœur de la synchro K40. silent=true => synchro de FOND (auto). Dans les DEUX cas on
   // rafraîchit la VUE via refreshData() (bump dataVersion) au lieu de recharger la page :
   // les nouvelles données apparaissent direct dans l'app, sans navigation ni reload.
+  // Renvoie true (succès) / false (échec) / null (ignoré : déjà en cours) — pilote la pastille.
   const runSync = async ({ silent }) => {
-    if (syncingRef.current) return; // évite tout chevauchement manuel/auto
+    if (syncingRef.current) return null; // déjà en cours -> ne change pas l'état
     syncingRef.current = true;
     if (!silent) {
       setSync(true);
       toast("Synchronisation en cours…", "info");
     }
+    let ok = false;
     try {
       const r = await apiPost("/api/k40/sync", {});
       setLastSync(new Date());
+      ok = true;
       const nouveaux = Number(r?.traites ?? 0);
       if (!silent) {
         refreshData(); // rafraîchit les vues ouvertes, sans reload
@@ -160,6 +158,7 @@ export default function TopNav({ onMenuClick }) {
         toast(`${nouveaux} nouveau(x) pointage(s) synchronisé(s)`, "success");
       }
     } catch (e) {
+      ok = false;
       // En auto : échec silencieux (le K40 bufferise, on réessaiera au prochain tick).
       if (!silent) {
         toast(e?.message || "Échec de la synchronisation (K40 joignable ?)", "error");
@@ -167,23 +166,33 @@ export default function TopNav({ onMenuClick }) {
       }
     }
     syncingRef.current = false;
+    return ok;
   };
 
-  const synchroniser = () => runSync({ silent: false });
-
-  // Auto-synchro K40 toutes les 5 s tant que l'app est ouverte (et l'auto activé).
-  // Le verrou syncingRef évite tout chevauchement si une synchro dépasse 5 s.
+  // Décompte de 10 s : chaque seconde décrémente ; à 0 -> synchro K40 puis re-décompte.
+  // Le résultat (ok/échec) colore la pastille en vert/rouge. Verrou anti-chevauchement.
   useEffect(() => {
     if (!autoSync) return undefined;
-    const id = setInterval(() => runSync({ silent: true }), 5000);
+    tickRef.current = 10;
+    setCompteur(10);
+    const id = setInterval(() => {
+      const next = tickRef.current - 1;
+      if (next <= 0) {
+        tickRef.current = 10;
+        setCompteur(10);
+        runSync({ silent: true }).then((ok) => { if (ok != null) setEtatSync(ok ? "ok" : "echec"); });
+      } else {
+        tickRef.current = next;
+        setCompteur(next);
+      }
+    }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSync]);
 
   const actions = [
     { label: "Payer les employés", icon: "payments", onClick: () => { fermer(); navigate("/finance"); } },
-    { label: "Ajouter un employé", icon: "person_add", onClick: () => { fermer(); openAddEmployee(); } },
-    { label: "Enrôler (biométrie)", icon: "fingerprint", onClick: () => { fermer(); navigate("/enrolement"); } },
+    { label: "Ajouter un employé", icon: "fingerprint", onClick: () => { fermer(); navigate("/enrolement"); } },
   ];
 
   const anyOpen = menu || (searchOpen && q);
@@ -221,7 +230,7 @@ export default function TopNav({ onMenuClick }) {
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setSearchOpen(true)}
               className="bg-transparent border-none outline-none text-sm w-full text-texte placeholder:text-subtle"
-              placeholder="Rechercher un employé ou une agence…"
+              placeholder="Rechercher un employé…"
               type="text"
             />
             <span className="ml-2 text-[10px] font-medium text-subtle bg-surface border border-border rounded-md px-1.5 py-0.5 shrink-0">Ctrl K</span>
@@ -248,81 +257,37 @@ export default function TopNav({ onMenuClick }) {
                   ))}
                 </div>
               )}
-              {resAgences.length > 0 && (
-                <div className="py-1.5 border-t border-border">
-                  <p className="kicker px-4 py-1">Agences</p>
-                  {resAgences.map((a) => (
-                    <button
-                      key={a}
-                      onClick={() => { setQuery(""); setSearchOpen(false); choisirAgence(a); navigate("/"); }}
-                      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-surface-2 text-left transition-colors"
-                    >
-                      <span className="w-7 h-7 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-                        <Icon name="apartment" className="text-[16px]" />
-                      </span>
-                      <span className="text-sm text-texte">{a}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Droite : agence + actions + notif + profil */}
+      {/* Droite : auto-synchro + notif + profil */}
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
-        {/* Synchronisation globale : pointages K40 + rafraîchit les données de l'app */}
-        <button
-          onClick={synchroniser}
-          disabled={sync}
-          className="flex items-center gap-1.5 px-2.5 lg:px-3 py-2 rounded-lg border border-border-strong bg-surface hover:bg-surface-2 text-sm text-texte transition-colors disabled:opacity-50"
-          aria-label="Synchroniser les données"
-          title="Synchroniser (pointages K40 + données de l'app)"
-        >
-          <Icon name="sync" className={`text-subtle text-[18px] ${sync ? "animate-spin" : ""}`} />
-          <span className="truncate hidden lg:inline">{sync ? "Synchro…" : "Synchroniser"}</span>
-        </button>
-        {/* Interrupteur auto-synchro K40 (toutes les 30 s) */}
+        {/* Auto-synchro K40 : décompte 10 s, vert si la dernière a réussi / rouge si échec */}
         <button
           onClick={() => setAutoSync((a) => !a)}
-          className="flex items-center gap-1.5 px-2 py-2 rounded-lg border border-border-strong bg-surface hover:bg-surface-2 text-xs text-muted transition-colors"
           aria-pressed={autoSync}
-          title={`Auto-synchro K40 ${autoSync ? "activée (toutes les 5 s)" : "désactivée"}${lastSync ? ` · dernière : ${lastSync.toLocaleTimeString("fr-FR")}` : ""}`}
+          title={`Auto-synchro K40 ${autoSync ? "activée (toutes les 10 s)" : "désactivée — cliquer pour activer"}${lastSync ? ` · dernière : ${lastSync.toLocaleTimeString("fr-FR")}` : ""}`}
+          className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-xs font-medium transition-colors min-w-[82px] justify-center ${
+            !autoSync
+              ? "border-border-strong bg-surface text-muted hover:bg-surface-2"
+              : etatSync === "echec"
+              ? "border-rose-300 bg-rose-50 text-rose-600"
+              : etatSync === "ok"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+              : "border-border-strong bg-surface text-muted"
+          }`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${autoSync ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
-          <span className="hidden lg:inline">Auto&nbsp;30s</span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              !autoSync ? "bg-slate-400" : etatSync === "echec" ? "bg-rose-500" : etatSync === "ok" ? "bg-emerald-500" : "bg-slate-400"
+            } ${autoSync && sync ? "animate-pulse" : ""}`}
+          />
+          <span className="tabular-nums whitespace-nowrap">
+            {!autoSync ? "Auto off" : sync ? "Sync…" : `Auto ${compteur}s`}
+          </span>
         </button>
-        {/* Sélecteur d'agence (visible aussi sur mobile : pilotage central, libellé masqué en compact) */}
-        <div className="relative block z-50">
-          <button
-            onClick={() => basculer("agence")}
-            className="flex items-center gap-2 px-2.5 lg:px-3 py-2 rounded-lg border border-border-strong bg-surface hover:bg-surface-2 text-sm text-texte transition-colors max-w-[180px]"
-            aria-haspopup="listbox"
-            aria-expanded={menu === "agence"}
-            aria-label={`Filtrer par agence (actuel : ${agence})`}
-          >
-            <Icon name="apartment" className="text-subtle text-[18px]" />
-            <span className="truncate hidden lg:inline">{agence}</span>
-            <Icon name="expand_more" className={`text-subtle text-[18px] transition-transform duration-150 ${menu === "agence" ? "rotate-180" : ""}`} />
-          </button>
-          {menu === "agence" && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-2xl shadow-pop p-1.5 modal-in">
-              {["Toutes les agences", ...agencesList].map((a) => (
-                <button
-                  key={a}
-                  onClick={() => choisirAgence(a)}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    agence === a ? "bg-brand-50 text-brand-700 font-medium" : "text-muted hover:bg-surface-2 hover:text-texte"
-                  }`}
-                >
-                  {a}
-                  {agence === a && <Icon name="check" className="text-brand-600 text-[18px]" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Actions rapides */}
         <div className="relative z-50">
@@ -378,7 +343,7 @@ export default function TopNav({ onMenuClick }) {
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-texte truncate">{a.type}</p>
                       <p className="text-xs text-muted line-clamp-1">{a.message}</p>
-                      <p className="text-[11px] text-subtle mt-0.5">{a.time} · {a.agence}</p>
+                      <p className="text-[11px] text-subtle mt-0.5">{a.time}</p>
                     </div>
                   </Link>
                 ))}
