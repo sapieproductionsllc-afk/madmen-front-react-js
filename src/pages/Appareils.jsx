@@ -4,7 +4,7 @@ import Button from "../components/ui/Button.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet } from "../lib/api.js";
+import { apiGet, apiPost } from "../lib/api.js";
 
 // Formate un horodatage SQL (YYYY-MM-DD HH:MM:SS) en heure courte "HH:MM".
 // Renvoie une valeur neutre si le format est inattendu plutôt que de planter.
@@ -67,6 +67,10 @@ function styleType(type) {
   return { icon: "fingerprint", bg: "bg-brand-50 text-brand-600" };
 }
 
+// Normalise le statut : l'API renvoie "en_ligne"/"hors_ligne" (base locale) ou déjà
+// "En ligne"/"Hors ligne" (autre seed) — on affiche toujours le format attendu par la pastille.
+const STATUT_APP = { en_ligne: "En ligne", hors_ligne: "Hors ligne", maintenance: "Maintenance" };
+
 // Appareil API {id,name,type,agence,status,lastSync} -> objet attendu par CarteAppareil.
 // Champs absents de l'API mis à une valeur neutre pour ne rien casser : ip, firmware, stats.
 function mapAppareil(a) {
@@ -77,7 +81,7 @@ function mapAppareil(a) {
     type: a.type || "—",
     icon,
     bg,
-    status: a.status || "—",
+    status: STATUT_APP[a.status] || a.status || "—",
     ip: a.ip || "—", // absent de l'API
     firmware: a.firmware || "—", // absent de l'API
     emplacement: a.agence || "—",
@@ -162,9 +166,29 @@ export default function Appareils({ embedded = false }) {
       .finally(() => setEvChargement(false));
   }, []);
 
+  // Pousse les utilisateurs + les empreintes enrôlées vers le K40 (via pyzk côté API).
+  // L'employé peut alors pointer au doigt sur le terminal.
+  const [syncK40, setSyncK40] = useState(false);
+  const synchroniserK40 = async () => {
+    if (syncK40) return;
+    setSyncK40(true);
+    toast("Synchronisation des empreintes vers le K40…", "info");
+    try {
+      await apiPost("/api/k40/push-all", {});
+      const r = await apiPost("/api/k40/push-fingerprints", {});
+      toast(`K40 synchronisé — ${r?.synced ?? 0} empreinte(s) envoyée(s)`, "success");
+    } catch (e) {
+      toast(e?.message || "Échec de la synchro K40 (le terminal est-il joignable ?)", "error");
+    } finally {
+      setSyncK40(false);
+    }
+  };
+
   const actions = (
     <div className="flex gap-2 shrink-0">
-      <Button variant="secondary" icon="sync" onClick={() => toast("Synchronisation des 2 appareils lancée", "success")}>Tout synchroniser</Button>
+      <Button variant="secondary" icon="sync" onClick={synchroniserK40} disabled={syncK40}>
+        {syncK40 ? "Synchro…" : "Synchroniser le K40"}
+      </Button>
       <Button variant="primary" icon="add" onClick={() => toast("Ajout d'appareil ouvert", "info")}>Ajouter un appareil</Button>
     </div>
   );
@@ -184,7 +208,7 @@ export default function Appareils({ embedded = false }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {appareils.map((a) => (
-            <CarteAppareil key={a.id} a={a} onSync={(d) => toast(`${d.nom} synchronisé`, "success")} onConfig={(d) => toast(`Configuration de ${d.nom} ouverte`, "info")} />
+            <CarteAppareil key={a.id} a={a} onSync={synchroniserK40} onConfig={(d) => toast(`Configuration de ${d.nom} ouverte`, "info")} />
           ))}
         </div>
       )}

@@ -262,6 +262,18 @@ export default function Enrolement() {
 
       const res = await apiPost("/api/employes", payload);
       setCree(res || {});
+
+      // Enregistre l'empreinte capturée + la pousse au K40 -> l'employé pourra pointer au doigt.
+      if (template && res?.id) {
+        try {
+          await apiPost(`/api/employes/${res.id}/biometrie`, { type: "empreinte", template, doigt: "index_droit" });
+          await apiPost(`/api/k40/push-user/${res.id}`, {});
+          await apiPost("/api/k40/push-fingerprints", {});
+        } catch {
+          toast("Employé créé — pense à cliquer « Synchroniser le K40 » dans Appareils", "info");
+        }
+      }
+
       setDone(true);
       toast(`${form.nom.trim()} a été enrôlé avec succès`);
     } catch (err) {
