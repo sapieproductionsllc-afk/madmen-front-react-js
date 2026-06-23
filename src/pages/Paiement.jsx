@@ -5,6 +5,7 @@ import Button from "../components/ui/Button.jsx";
 import Table from "../components/ui/Table.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import BandeauAgent from "../components/ui/BandeauAgent.jsx";
+import SalaireFixe from "../components/salaire/SalaireFixe.jsx";
 import { Input, Field } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { fcfa } from "../data/datasets.js";
@@ -71,6 +72,8 @@ export default function Paiement() {
   const [live, setLive] = useState("Absent"); // l'API /api/paie n'expose pas de statut temps réel
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const [empId, setEmpId] = useState(null); // id NUMÉRIQUE (pour les endpoints salaire)
+  const [tick, setTick] = useState(0); // recharge le bulletin après modif du salaire fixe
 
   // Composition du salaire (modifiable) + avances en cours (dette) + statut.
   const [compo, setCompo] = useState({ base: 0, primes: 0, retenues: 0 });
@@ -114,6 +117,7 @@ export default function Paiement() {
           ? [{ mois: paie.moisLabel || "Mois en cours", net: paie.net, status: paie.status }]
           : [];
 
+        setEmpId(agentApi?.id ?? null);
         setE(agent);
         setBase(paie);
         setPaiements(histo);
@@ -131,7 +135,7 @@ export default function Paiement() {
     return () => {
       actif = false;
     };
-  }, [id]);
+  }, [id, tick]);
 
   if (chargement) {
     return (
@@ -245,6 +249,9 @@ export default function Paiement() {
           </Button>
         </div>
       </div>
+
+      {/* Salaire fixe (historique daté) — alimente le calcul de paie */}
+      {empId && <SalaireFixe employeId={empId} onChange={() => setTick((t) => t + 1)} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Composition du salaire (éditable) */}
