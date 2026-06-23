@@ -1,12 +1,13 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import Icon from "../ui/Icon.jsx";
 import logo from "../../assets/logo.png";
+import { apiGet } from "../../lib/api.js";
 
 // Tracé « ECG » du moniteur K40 : un battement relatif (dx total = 100, revient à la ligne),
 // répété deux fois pour un défilement sans couture (translateX -50%).
 const BEAT = "h10 q4,-5 8,0 h6 l2,2 l3,-16 l3,22 l3,-8 h8 q6,-6 12,0 h45";
 const ECG = `M0,20 ${BEAT} ${BEAT}`;
-const K40_CONNECTE = true; // état de la pointeuse K40 (à brancher au backend)
 
 // Navigation regroupée par pôle métier (chaque page a un rôle unique).
 // NB : Alertes → accessible via la cloche du header ; Enrôlement → via la page Employés.
@@ -74,6 +75,25 @@ function LienNav({ item, onNavigate }) {
 }
 
 export default function SideNav({ open, onClose }) {
+  // Statut réel de la pointeuse K40 : null = vérification, true/false = vrai état API.
+  const [k40Connecte, setK40Connecte] = useState(null);
+  useEffect(() => {
+    let actif = true;
+    const verifier = () =>
+      apiGet("/api/k40/status")
+        .then((r) => actif && setK40Connecte(!!r?.connected))
+        .catch(() => actif && setK40Connecte(false));
+    verifier();
+    const t = setInterval(verifier, 30000); // re-vérifie toutes les 30 s
+    return () => { actif = false; clearInterval(t); };
+  }, []);
+
+  const verif = k40Connecte === null;
+  const connecte = k40Connecte === true;
+  const k40Label = verif ? "Vérification…" : connecte ? "Connecté" : "Hors ligne";
+  const k40Txt = verif ? "text-amber-600" : connecte ? "text-emerald-600" : "text-rose-600";
+  const k40Dot = verif ? "bg-amber-500 animate-pulse" : connecte ? "bg-emerald-500 animate-pulse" : "bg-rose-500";
+
   return (
     <>
       {open && (
@@ -134,9 +154,9 @@ export default function SideNav({ open, onClose }) {
                     <p className="text-[11px] text-ink/60 mt-1">Pointeuse biométrique</p>
                   </div>
                 </div>
-                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${K40_CONNECTE ? "text-emerald-600" : "text-rose-600"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${K40_CONNECTE ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
-                  {K40_CONNECTE ? "Connecté" : "Hors ligne"}
+                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${k40Txt}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${k40Dot}`} />
+                  {k40Label}
                 </span>
               </div>
               <div className="relative h-12 rounded-lg overflow-hidden bg-[#08160f] ecg-grid ring-1 ring-black/30">

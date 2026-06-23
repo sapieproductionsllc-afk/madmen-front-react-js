@@ -306,41 +306,44 @@ export default function Messagerie({ embedded = false }) {
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto scroll-thin p-4 flex flex-col space-y-2.5 bg-surface" role="log" aria-live="polite" aria-label={conv.broadcast ? "Fil de diffusion" : `Conversation avec ${conv.name}`}>
-                {messages.map((m, i) => {
-                  const moi = m.de === "moi";
-                  const bulle = moi ? "bg-brand-600 text-white rounded-br-sm" : "bg-surface-2 text-texte rounded-bl-sm";
-                  return (
-                    <div key={i} className={`flex flex-col ${moi ? "items-end" : "items-start"}`}>
-                      {m.type === "document" ? (
-                        <div className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 max-w-[78%] ${bulle}`}>
-                          <Icon name="description" className="text-[24px] shrink-0" filled />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{m.nom}</p>
-                            <p className={`text-[11px] ${moi ? "text-white/85" : "text-subtle"}`}>{m.taille}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => toast("Téléchargement du document…", "info")}
-                            aria-label={`Télécharger ${m.nom}`}
-                            className={`ml-1 shrink-0 rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 ${moi ? "hover:bg-white/15 focus-visible:ring-white/60" : "hover:bg-black/5 focus-visible:ring-brand-600"}`}
-                          >
-                            <Icon name="download" className="text-[18px]" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className={`rounded-2xl px-3.5 py-2 max-w-[75%] text-sm leading-relaxed ${bulle}`}>{m.texte}</div>
-                      )}
-                      <span className="text-[10px] text-subtle mt-0.5 tabular-nums px-1">{m.heure}{moi && conv.broadcast ? " · Diffusé à tous" : ""}</span>
-                    </div>
-                  );
-                })}
-                {messages.length === 0 && (
+              <div className="flex-1 overflow-y-auto scroll-thin p-4 flex flex-col bg-surface" role="log" aria-live="polite" aria-label={conv.broadcast ? "Fil de diffusion" : `Conversation avec ${conv.name}`}>
+                {messages.length === 0 ? (
                   <p className="m-auto text-sm text-subtle">
                     {chargementFil ? "Chargement de la conversation…" : "Aucun message — démarrez la conversation."}
                   </p>
+                ) : (
+                  <div className="mt-auto flex flex-col space-y-2.5">
+                    {messages.map((m, i) => {
+                      const moi = m.de === "moi";
+                      const bulle = moi ? "bg-brand-600 text-white rounded-br-sm" : "bg-surface-2 text-texte rounded-bl-sm";
+                      return (
+                        <div key={i} className={`flex flex-col ${moi ? "items-end" : "items-start"}`}>
+                          {m.type === "document" ? (
+                            <div className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 max-w-[78%] ${bulle}`}>
+                              <Icon name="description" className="text-[24px] shrink-0" filled />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{m.nom}</p>
+                                <p className={`text-[11px] ${moi ? "text-white/85" : "text-subtle"}`}>{m.taille}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toast("Téléchargement du document…", "info")}
+                                aria-label={`Télécharger ${m.nom}`}
+                                className={`ml-1 shrink-0 rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 ${moi ? "hover:bg-white/15 focus-visible:ring-white/60" : "hover:bg-black/5 focus-visible:ring-brand-600"}`}
+                              >
+                                <Icon name="download" className="text-[18px]" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className={`rounded-2xl px-3.5 py-2 max-w-[75%] text-sm leading-relaxed ${bulle}`}>{m.texte}</div>
+                          )}
+                          <span className="text-[10px] text-subtle mt-0.5 tabular-nums px-1">{m.heure}{moi && conv.broadcast ? " · Diffusé à tous" : ""}</span>
+                        </div>
+                      );
+                    })}
+                    <div ref={finFilRef} />
+                  </div>
                 )}
-                <div ref={finFilRef} />
               </div>
 
               <div className="border-t border-border p-3 flex items-center gap-2 shrink-0 bg-surface">

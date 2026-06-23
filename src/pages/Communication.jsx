@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import PageHeader from "../components/ui/PageHeader.jsx";
 import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import Avatar from "../components/ui/Avatar.jsx";
@@ -164,10 +163,8 @@ export default function Communication() {
   const railItem = (actif) => `w-full flex items-center gap-3 px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${actif ? "bg-brand-50" : "hover:bg-surface-2"}`;
 
   return (
-    <div className="space-y-5 pb-2">
-      <PageHeader title="Communication" subtitle="Approuvez les demandes et échangez avec le personnel." />
-
-      <div className="card overflow-hidden h-[calc(100dvh-13rem)] min-h-[30rem] flex p-0">
+    <div className="h-full">
+      <div className="card overflow-hidden h-full min-h-[30rem] flex p-0 rounded-none border-0">
         {/* RAIL GAUCHE */}
         <aside aria-label="Canaux et conversations" className={`w-72 shrink-0 border-r border-border flex-col ${sel ? "hidden md:flex" : "flex"}`}>
           {/* Canal Demandes (épinglé) */}
@@ -293,27 +290,32 @@ export default function Communication() {
               </header>
               {conv.broadcast && <div className="px-4 py-2 bg-or-50 border-b border-or-100 text-xs text-or-700 flex items-center gap-1.5"><Icon name="info" className="text-[15px]" /> Vos messages seront diffusés à tout le personnel.</div>}
 
-              <div className="flex-1 overflow-y-auto scroll-thin p-4 flex flex-col space-y-2.5 bg-surface-2/30" role="log" aria-live="polite" aria-label={conv.broadcast ? "Fil de diffusion" : `Conversation avec ${conv.name}`}>
-                {messages.map((m, i) => {
-                  const moi = m.de === "moi";
-                  const bulle = moi ? "bg-brand-600 text-white rounded-br-sm" : "bg-surface-2 text-texte rounded-bl-sm";
-                  return (
-                    <div key={i} className={`flex flex-col ${moi ? "items-end" : "items-start"}`}>
-                      {m.type === "document" ? (
-                        <div className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 max-w-[78%] ${bulle}`}>
-                          <Icon name="description" className="text-[24px] shrink-0" filled />
-                          <div className="min-w-0"><p className="text-sm font-medium truncate">{m.nom}</p><p className={`text-[11px] ${moi ? "text-white/85" : "text-subtle"}`}>{m.taille}</p></div>
-                          <button type="button" onClick={() => toast("Téléchargement du document…", "info")} aria-label={`Télécharger ${m.nom}`} className={`ml-1 shrink-0 rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 ${moi ? "hover:bg-white/15 focus-visible:ring-white/60" : "hover:bg-black/5 focus-visible:ring-brand-600"}`}><Icon name="download" className="text-[18px]" /></button>
+              <div className="flex-1 overflow-y-auto scroll-thin p-4 flex flex-col bg-surface-2/30" role="log" aria-live="polite" aria-label={conv.broadcast ? "Fil de diffusion" : `Conversation avec ${conv.name}`}>
+                {messages.length === 0 ? (
+                  <p className="m-auto text-sm text-subtle">Aucun message — démarrez la conversation.</p>
+                ) : (
+                  <div className="mt-auto flex flex-col space-y-2.5">
+                    {messages.map((m, i) => {
+                      const moi = m.de === "moi";
+                      const bulle = moi ? "bg-brand-600 text-white rounded-br-sm" : "bg-surface-2 text-texte rounded-bl-sm";
+                      return (
+                        <div key={i} className={`flex flex-col ${moi ? "items-end" : "items-start"}`}>
+                          {m.type === "document" ? (
+                            <div className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 max-w-[78%] ${bulle}`}>
+                              <Icon name="description" className="text-[24px] shrink-0" filled />
+                              <div className="min-w-0"><p className="text-sm font-medium truncate">{m.nom}</p><p className={`text-[11px] ${moi ? "text-white/85" : "text-subtle"}`}>{m.taille}</p></div>
+                              <button type="button" onClick={() => toast("Téléchargement du document…", "info")} aria-label={`Télécharger ${m.nom}`} className={`ml-1 shrink-0 rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 ${moi ? "hover:bg-white/15 focus-visible:ring-white/60" : "hover:bg-black/5 focus-visible:ring-brand-600"}`}><Icon name="download" className="text-[18px]" /></button>
+                            </div>
+                          ) : (
+                            <div className={`rounded-2xl px-3.5 py-2 max-w-[75%] text-sm leading-relaxed ${bulle}`}>{m.texte}</div>
+                          )}
+                          <span className="text-[10px] text-subtle mt-0.5 tabular-nums px-1">{m.heure}{moi && conv.broadcast ? " · Diffusé à tous" : ""}</span>
                         </div>
-                      ) : (
-                        <div className={`rounded-2xl px-3.5 py-2 max-w-[75%] text-sm leading-relaxed ${bulle}`}>{m.texte}</div>
-                      )}
-                      <span className="text-[10px] text-subtle mt-0.5 tabular-nums px-1">{m.heure}{moi && conv.broadcast ? " · Diffusé à tous" : ""}</span>
-                    </div>
-                  );
-                })}
-                {messages.length === 0 && <p className="m-auto text-sm text-subtle">Aucun message — démarrez la conversation.</p>}
-                <div ref={finFilRef} />
+                      );
+                    })}
+                    <div ref={finFilRef} />
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-border p-3 flex items-center gap-2 shrink-0 bg-surface">
