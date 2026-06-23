@@ -71,7 +71,7 @@ function ItemMenu({ icon, label, onClick, to, state, danger }) {
 }
 
 export default function TopNav({ onMenuClick }) {
-  const { openAddEmployee, agence, setAgence, toast } = useUI();
+  const { openAddEmployee, agence, setAgence, toast, refreshData, dataVersion } = useUI();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menu, setMenu] = useState(null); // "notif" | "profil" | "actions" | "agence"
@@ -83,7 +83,7 @@ export default function TopNav({ onMenuClick }) {
   const [alertes, setAlertes] = useState([]);
   const [employes, setEmployes] = useState([]);
   const [sync, setSync] = useState(false);
-  const [autoSync, setAutoSync] = useState(true); // auto-synchro K40 toutes les 30 s
+  const [autoSync, setAutoSync] = useState(true); // auto-synchro K40 toutes les 5 s
   const [lastSync, setLastSync] = useState(null);
   const syncingRef = useRef(false); // garde anti-chevauchement (manuel + auto)
 
@@ -112,7 +112,7 @@ export default function TopNav({ onMenuClick }) {
         setAlertes([]);
         setEmployes([]);
       });
-  }, []);
+  }, [dataVersion]);
 
   const nonLues = alertes.filter((a) => !a.read).length;
   const fermer = () => setMenu(null);
@@ -137,8 +137,9 @@ export default function TopNav({ onMenuClick }) {
     toast(`Vue filtrée sur : ${a}`, "info");
   };
 
-  // Cœur de la synchro K40. silent=true => synchro de FOND (auto) : sans toast ni reload.
-  // Le manuel garde le comportement d'avant (toast + reload pour rafraîchir l'affichage).
+  // Cœur de la synchro K40. silent=true => synchro de FOND (auto). Dans les DEUX cas on
+  // rafraîchit la VUE via refreshData() (bump dataVersion) au lieu de recharger la page :
+  // les nouvelles données apparaissent direct dans l'app, sans navigation ni reload.
   const runSync = async ({ silent }) => {
     if (syncingRef.current) return; // évite tout chevauchement manuel/auto
     syncingRef.current = true;
@@ -149,13 +150,15 @@ export default function TopNav({ onMenuClick }) {
     try {
       const r = await apiPost("/api/k40/sync", {});
       setLastSync(new Date());
+      const nouveaux = Number(r?.traites ?? 0);
       if (!silent) {
-        toast(`Synchronisé — ${r?.traites ?? 0} pointage(s) à jour`, "success");
-        setTimeout(() => window.location.reload(), 700);
-        return; // garde NON libérée volontairement : la page va se recharger
+        refreshData(); // rafraîchit les vues ouvertes, sans reload
+        toast(nouveaux > 0 ? `Synchronisé — ${nouveaux} pointage(s) à jour` : "Déjà à jour", "success");
+        setSync(false);
+      } else if (nouveaux > 0) {
+        refreshData(); // auto : on ne rafraîchit la vue QUE s'il y a du nouveau
+        toast(`${nouveaux} nouveau(x) pointage(s) synchronisé(s)`, "success");
       }
-      // Fond silencieux : un toast discret uniquement s'il y a du nouveau.
-      if ((r?.traites ?? 0) > 0) toast(`${r.traites} nouveau(x) pointage(s) synchronisé(s)`, "success");
     } catch (e) {
       // En auto : échec silencieux (le K40 bufferise, on réessaiera au prochain tick).
       if (!silent) {
@@ -168,10 +171,11 @@ export default function TopNav({ onMenuClick }) {
 
   const synchroniser = () => runSync({ silent: false });
 
-  // Auto-synchro K40 toutes les 30 s tant que l'app est ouverte (et l'auto activé).
+  // Auto-synchro K40 toutes les 5 s tant que l'app est ouverte (et l'auto activé).
+  // Le verrou syncingRef évite tout chevauchement si une synchro dépasse 5 s.
   useEffect(() => {
     if (!autoSync) return undefined;
-    const id = setInterval(() => runSync({ silent: true }), 30000);
+    const id = setInterval(() => runSync({ silent: true }), 5000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSync]);
@@ -284,7 +288,7 @@ export default function TopNav({ onMenuClick }) {
           onClick={() => setAutoSync((a) => !a)}
           className="flex items-center gap-1.5 px-2 py-2 rounded-lg border border-border-strong bg-surface hover:bg-surface-2 text-xs text-muted transition-colors"
           aria-pressed={autoSync}
-          title={`Auto-synchro K40 ${autoSync ? "activée (toutes les 30 s)" : "désactivée"}${lastSync ? ` · dernière : ${lastSync.toLocaleTimeString("fr-FR")}` : ""}`}
+          title={`Auto-synchro K40 ${autoSync ? "activée (toutes les 5 s)" : "désactivée"}${lastSync ? ` · dernière : ${lastSync.toLocaleTimeString("fr-FR")}` : ""}`}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${autoSync ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
           <span className="hidden lg:inline">Auto&nbsp;30s</span>
