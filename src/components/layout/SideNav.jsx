@@ -23,6 +23,7 @@ const navGroups = [
     title: "Gestion",
     items: [
       { label: "Agents", icon: "groups", to: "/employes" },
+      { label: "Pointage & Horaires", icon: "event_available", to: "/pointage-horaires" },
       { label: "Postes", icon: "desktop_windows", to: "/postes" },
       { label: "Finance & Paie", icon: "payments", to: "/finance" },
       // Objectifs masqué du menu (page et route conservées : /objectifs).
