@@ -6,10 +6,14 @@ import Appareils from "./Appareils.jsx";
 import Utilisateurs from "./Utilisateurs.jsx";
 import Parametres from "./Parametres.jsx";
 import Identifiants from "./Identifiants.jsx";
+import PointageHoraires from "./PointageHoraires.jsx";
+import JoursFeries from "./JoursFeries.jsx";
 
 const SECTIONS = [
   { key: "appareils", label: "Appareils", icon: "sensors" },
   { key: "identifiants", label: "Identifiants", icon: "key" },
+  { key: "pointage", label: "Pointage & Horaires", icon: "event_available" },
+  { key: "feries", label: "Jours fériés", icon: "event" },
   { key: "utilisateurs", label: "Utilisateurs", icon: "admin_panel_settings" },
   { key: "parametres", label: "Paramètres", icon: "settings" },
 ];
@@ -52,6 +56,8 @@ export default function Administration() {
       {/* Contenu */}
       {sec === "appareils" && <Appareils embedded />}
       {sec === "identifiants" && <Identifiants embedded />}
+      {sec === "pointage" && <PointageHoraires embedded />}
+      {sec === "feries" && <JoursFeries embedded />}
       {sec === "utilisateurs" && <Utilisateurs embedded />}
       {sec === "parametres" && <Parametres embedded onDirty={setParamsDirty} />}
     </div>

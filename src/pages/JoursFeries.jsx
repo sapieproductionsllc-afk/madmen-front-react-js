@@ -20,7 +20,7 @@ function formatDate(iso) {
 const anneeCourante = new Date().getFullYear();
 
 // Gestion des jours fériés : payés, jamais comptés comme absence dans la paie.
-export default function JoursFeries() {
+export default function JoursFeries({ embedded = false }) {
   const { toast, confirm } = useUI();
   const [annee, setAnnee] = useState(anneeCourante);
   const [feries, setFeries] = useState([]);
@@ -79,10 +79,17 @@ export default function JoursFeries() {
   };
 
   return (
-    <div className="space-y-5 pb-12">
-      <PageHeader title="Jours fériés" subtitle="Les jours fériés sont payés et ne comptent jamais comme absence dans la paie.">
-        <Button icon="add" onClick={ouvrirAjout}>Ajouter un jour férié</Button>
-      </PageHeader>
+    <div className={embedded ? "space-y-5" : "space-y-5 pb-12"}>
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted">Les jours fériés sont payés et ne comptent jamais comme absence dans la paie.</p>
+          <Button icon="add" onClick={ouvrirAjout}>Ajouter un jour férié</Button>
+        </div>
+      ) : (
+        <PageHeader title="Jours fériés" subtitle="Les jours fériés sont payés et ne comptent jamais comme absence dans la paie.">
+          <Button icon="add" onClick={ouvrirAjout}>Ajouter un jour férié</Button>
+        </PageHeader>
+      )}
 
       {/* Sélecteur d'année */}
       <div className="flex items-center justify-center gap-3">
