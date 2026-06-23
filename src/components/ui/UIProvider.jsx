@@ -106,8 +106,11 @@ export function UIProvider({ children }) {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onSaved={(nom) => {
-          setAddOpen(false);
-          toast(`Employé « ${nom} » ajouté avec succès`);
+          // Ne PAS fermer ici : le modal affiche d'abord les identifiants générés
+          // (matricule + PIN), puis se ferme via « Terminé ». On notifie + on demande
+          // à la liste des agents de se rafraîchir.
+          toast(`Employé « ${nom} » créé`);
+          window.dispatchEvent(new CustomEvent("madmen:employe-cree"));
         }}
       />
     </UICtx.Provider>

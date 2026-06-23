@@ -23,6 +23,7 @@ const navGroups = [
     title: "Gestion",
     items: [
       { label: "Agents", icon: "groups", to: "/employes" },
+      { label: "Postes", icon: "desktop_windows", to: "/postes" },
       { label: "Finance & Paie", icon: "payments", to: "/finance" },
       // Objectifs masqué du menu (page et route conservées : /objectifs).
       { label: "Communication", icon: "forum", to: "/communication" },
