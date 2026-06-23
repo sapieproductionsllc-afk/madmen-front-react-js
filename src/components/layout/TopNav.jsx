@@ -83,6 +83,9 @@ export default function TopNav({ onMenuClick }) {
   const [alertes, setAlertes] = useState([]);
   const [employes, setEmployes] = useState([]);
   const [sync, setSync] = useState(false);
+  const [autoSync, setAutoSync] = useState(true); // auto-synchro K40 toutes les 30 s
+  const [lastSync, setLastSync] = useState(null);
+  const syncingRef = useRef(false); // garde anti-chevauchement (manuel + auto)
 
   // Raccourci Ctrl/⌘ + K
   useEffect(() => {
@@ -134,20 +137,44 @@ export default function TopNav({ onMenuClick }) {
     toast(`Vue filtrée sur : ${a}`, "info");
   };
 
-  // Synchronisation manuelle : tire les pointages du K40 puis recharge les données de l'app.
-  const synchroniser = async () => {
-    if (sync) return;
-    setSync(true);
-    toast("Synchronisation en cours…", "info");
+  // Cœur de la synchro K40. silent=true => synchro de FOND (auto) : sans toast ni reload.
+  // Le manuel garde le comportement d'avant (toast + reload pour rafraîchir l'affichage).
+  const runSync = async ({ silent }) => {
+    if (syncingRef.current) return; // évite tout chevauchement manuel/auto
+    syncingRef.current = true;
+    if (!silent) {
+      setSync(true);
+      toast("Synchronisation en cours…", "info");
+    }
     try {
       const r = await apiPost("/api/k40/sync", {});
-      toast(`Synchronisé — ${r?.traites ?? 0} pointage(s) à jour`, "success");
-      setTimeout(() => window.location.reload(), 700);
+      setLastSync(new Date());
+      if (!silent) {
+        toast(`Synchronisé — ${r?.traites ?? 0} pointage(s) à jour`, "success");
+        setTimeout(() => window.location.reload(), 700);
+        return; // garde NON libérée volontairement : la page va se recharger
+      }
+      // Fond silencieux : un toast discret uniquement s'il y a du nouveau.
+      if ((r?.traites ?? 0) > 0) toast(`${r.traites} nouveau(x) pointage(s) synchronisé(s)`, "success");
     } catch (e) {
-      toast(e?.message || "Échec de la synchronisation (K40 joignable ?)", "error");
-      setSync(false);
+      // En auto : échec silencieux (le K40 bufferise, on réessaiera au prochain tick).
+      if (!silent) {
+        toast(e?.message || "Échec de la synchronisation (K40 joignable ?)", "error");
+        setSync(false);
+      }
     }
+    syncingRef.current = false;
   };
+
+  const synchroniser = () => runSync({ silent: false });
+
+  // Auto-synchro K40 toutes les 30 s tant que l'app est ouverte (et l'auto activé).
+  useEffect(() => {
+    if (!autoSync) return undefined;
+    const id = setInterval(() => runSync({ silent: true }), 30000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSync]);
 
   const actions = [
     { label: "Payer les employés", icon: "payments", onClick: () => { fermer(); navigate("/finance"); } },
@@ -251,6 +278,16 @@ export default function TopNav({ onMenuClick }) {
         >
           <Icon name="sync" className={`text-subtle text-[18px] ${sync ? "animate-spin" : ""}`} />
           <span className="truncate hidden lg:inline">{sync ? "Synchro…" : "Synchroniser"}</span>
+        </button>
+        {/* Interrupteur auto-synchro K40 (toutes les 30 s) */}
+        <button
+          onClick={() => setAutoSync((a) => !a)}
+          className="flex items-center gap-1.5 px-2 py-2 rounded-lg border border-border-strong bg-surface hover:bg-surface-2 text-xs text-muted transition-colors"
+          aria-pressed={autoSync}
+          title={`Auto-synchro K40 ${autoSync ? "activée (toutes les 30 s)" : "désactivée"}${lastSync ? ` · dernière : ${lastSync.toLocaleTimeString("fr-FR")}` : ""}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${autoSync ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+          <span className="hidden lg:inline">Auto&nbsp;30s</span>
         </button>
         {/* Sélecteur d'agence (visible aussi sur mobile : pilotage central, libellé masqué en compact) */}
         <div className="relative block z-50">
