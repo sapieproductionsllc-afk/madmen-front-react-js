@@ -5,7 +5,7 @@ import Avatar from "../ui/Avatar.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { agencesList } from "../../data/datasets.js";
-import { apiGet } from "../../lib/api.js";
+import { apiGet, apiPost } from "../../lib/api.js";
 import { mapEmploye } from "../../lib/mappers.js";
 import logo from "../../assets/logo.png";
 
@@ -82,6 +82,7 @@ export default function TopNav({ onMenuClick }) {
   // Données RÉELLES depuis l'API (remplacent les mocks de src/data) : cloche + recherche globale.
   const [alertes, setAlertes] = useState([]);
   const [employes, setEmployes] = useState([]);
+  const [sync, setSync] = useState(false);
 
   // Raccourci Ctrl/⌘ + K
   useEffect(() => {
@@ -131,6 +132,21 @@ export default function TopNav({ onMenuClick }) {
     setAgence(a);
     fermer();
     toast(`Vue filtrée sur : ${a}`, "info");
+  };
+
+  // Synchronisation manuelle : tire les pointages du K40 puis recharge les données de l'app.
+  const synchroniser = async () => {
+    if (sync) return;
+    setSync(true);
+    toast("Synchronisation en cours…", "info");
+    try {
+      const r = await apiPost("/api/k40/sync", {});
+      toast(`Synchronisé — ${r?.traites ?? 0} pointage(s) à jour`, "success");
+      setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+      toast(e?.message || "Échec de la synchronisation (K40 joignable ?)", "error");
+      setSync(false);
+    }
   };
 
   const actions = [
@@ -225,6 +241,17 @@ export default function TopNav({ onMenuClick }) {
 
       {/* Droite : agence + actions + notif + profil */}
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
+        {/* Synchronisation globale : pointages K40 + rafraîchit les données de l'app */}
+        <button
+          onClick={synchroniser}
+          disabled={sync}
+          className="flex items-center gap-1.5 px-2.5 lg:px-3 py-2 rounded-lg border border-border-strong bg-surface hover:bg-surface-2 text-sm text-texte transition-colors disabled:opacity-50"
+          aria-label="Synchroniser les données"
+          title="Synchroniser (pointages K40 + données de l'app)"
+        >
+          <Icon name="sync" className={`text-subtle text-[18px] ${sync ? "animate-spin" : ""}`} />
+          <span className="truncate hidden lg:inline">{sync ? "Synchro…" : "Synchroniser"}</span>
+        </button>
         {/* Sélecteur d'agence (visible aussi sur mobile : pilotage central, libellé masqué en compact) */}
         <div className="relative block z-50">
           <button
