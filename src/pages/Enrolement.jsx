@@ -395,7 +395,10 @@ export default function Enrolement() {
 
   // ---------- Wizard ----------
   return (
-    <div className="min-h-[calc(100vh-7rem)] flex flex-col justify-center">
+    // Pas de `justify-center` : le contenu s'aligne en haut et reste ENTIÈREMENT visible
+    // (le centrage forcé coupait le haut/bas quand le wizard dépassait la hauteur d'écran).
+    // Le `main` du Layout gère le scroll ; on garde une largeur confortable + marge basse.
+    <div className="reveal w-full max-w-5xl mx-auto pb-4">
       {/* Bandeau hero */}
       <div className="relative overflow-hidden rounded-[18px] bg-[#16463D] px-8 py-9 sm:px-10 sm:py-11">
         <Icon name="fingerprint" filled aria-hidden="true" className="pointer-events-none absolute -right-8 -bottom-16 text-white/[0.06] text-[300px] leading-none" />
