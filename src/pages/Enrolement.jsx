@@ -250,9 +250,9 @@ export default function Enrolement() {
     etape === 0
       ? form.nom.trim() && form.fonction.trim()
       : etape === 1
-        ? editMode || empreinteOk // en édition, re-capture d'empreinte facultative
+        ? true // empreinte FACULTATIVE : on enregistre la personne maintenant, le doigt plus tard
         : etape === 2
-          ? editMode || (form.badge.trim() && pinValide) // en édition, badge/PIN facultatifs
+          ? true // badge & PIN facultatifs (le PIN est généré automatiquement par le serveur)
           : atteste;
 
   const suivant = () => etapeValide && setEtape((e) => Math.min(e + 1, 3));
@@ -591,6 +591,11 @@ export default function Enrolement() {
                     />
                   ))}
                 </div>
+                {!empreinteOk && (
+                  <p className="mt-6 text-[11.5px] text-[#8C8678] text-center max-w-[270px] leading-relaxed">
+                    Étape facultative — vous pouvez enregistrer l'employé maintenant et enrôler l'empreinte plus tard.
+                  </p>
+                )}
               </div>
             )}
 
