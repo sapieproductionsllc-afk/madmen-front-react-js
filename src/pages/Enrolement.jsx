@@ -30,6 +30,13 @@ const aide = {
   3: "Vérifiez le récapitulatif. Une fois confirmé, l'employé pourra pointer immédiatement.",
 };
 
+// Options des champs RH (listes fermées).
+const SEXES = ["Homme", "Femme", "Autre"];
+const ETATS_CIVILS = ["Célibataire", "Marié(e)", "Divorcé(e)", "Veuf(ve)", "Union libre"];
+const TYPES_CONTRAT = ["CDI", "CDD", "Stage", "Intérim", "Consultant"];
+// Rôles proposés à l'enrôlement (super_admin volontairement exclu — voir la fiche).
+const ROLES = [["employe", "Employé"], ["superviseur", "Superviseur"], ["directeur", "Directeur"]];
+
 // Motif de code-barres fixe (déterministe) — largeurs en px, alternance barre/espace.
 const BARRES = [3, 1, 2, 1, 1, 3, 1, 2, 2, 1, 1, 1, 3, 1, 2, 1, 1, 2, 3, 1, 1, 2, 1, 3, 1, 1, 2, 1, 2, 1, 3, 1, 2, 1, 1, 2];
 
@@ -44,6 +51,19 @@ function Champ({ label, full, children }) {
       <span className="block text-[11.5px] font-medium text-[#6F6B60] mb-1.5">{label}</span>
       {children}
     </label>
+  );
+}
+
+// Section du formulaire (petit en-tête numéroté pour aérer une étape dense).
+function Section({ num, titre, children }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-5 h-5 rounded-md bg-[#E7F0EC] text-[#1C5C50] text-[11px] font-bold flex items-center justify-center shrink-0">{num}</span>
+        <span className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#6F6B60]">{titre}</span>
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -129,10 +149,17 @@ export default function Enrolement() {
   const { id: editId } = useParams(); // présent => mode « Modifier »
   const editMode = Boolean(editId);
   const [etape, setEtape] = useState(0);
-  const [form, setForm] = useState({ nom: "", fonction: "", departement: "", agence: "", email: "", badge: "", pin: "" });
-  // poste_id / departement_id sélectionnés (FK envoyées à l'API).
+  const [form, setForm] = useState({
+    nom: "", fonction: "", departement: "", email: "", badge: "", pin: "",
+    sexe: "", date_naissance: "", nationalite: "", etat_civil: "",
+    telephone: "", adresse: "",
+    contact_urgence_nom: "", contact_urgence_tel: "", contact_urgence_lien: "",
+    date_embauche: "", type_contrat: "", role: "",
+  });
+  // poste_id / departement_id / superieur_id sélectionnés (FK envoyées à l'API).
   const [posteId, setPosteId] = useState("");
   const [departementId, setDepartementId] = useState("");
+  const [superieurId, setSuperieurId] = useState("");
   const [photo, setPhoto] = useState(null); // aperçu (data URL) pour le badge
   const [photoFile, setPhotoFile] = useState(null); // fichier brut à téléverser
   const [captures, setCaptures] = useState(0);
@@ -144,6 +171,7 @@ export default function Enrolement() {
   // Listes alimentant les <select> (postes/départements), dérivées de l'API.
   const [postes, setPostes] = useState([]);
   const [departements, setDepartements] = useState([]);
+  const [superieurs, setSuperieurs] = useState([]); // employés (pour « supérieur hiérarchique »)
   // Résultat réel renvoyé par l'API après création (matricule + PIN générés).
   const [cree, setCree] = useState(null);
 
@@ -165,6 +193,11 @@ export default function Enrolement() {
         }
         setPostes([...pMap].map(([id, intitule]) => ({ id, intitule })).sort((a, b) => a.intitule.localeCompare(b.intitule)));
         setDepartements([...dMap].map(([id, nom]) => ({ id, nom })).sort((a, b) => a.nom.localeCompare(b.nom)));
+        setSuperieurs(
+          employes
+            .map((e) => ({ id: String(e.id), nom: (e.name || `${e.prenom ?? ""} ${e.nom ?? ""}`.trim()) || `#${e.id}` }))
+            .sort((a, b) => a.nom.localeCompare(b.nom)),
+        );
       } catch {
         /* API indisponible : on garde les listes vides, saisie texte de repli */
       }
@@ -187,9 +220,22 @@ export default function Enrolement() {
           fonction: e.poste_libelle || "",
           departement: e.departement_nom || "",
           email: e.email || "",
+          sexe: e.sexe || "",
+          date_naissance: e.date_naissance || "",
+          nationalite: e.nationalite || "",
+          etat_civil: e.etat_civil || "",
+          telephone: e.telephone || "",
+          adresse: e.adresse || "",
+          contact_urgence_nom: e.contact_urgence_nom || "",
+          contact_urgence_tel: e.contact_urgence_tel || "",
+          contact_urgence_lien: e.contact_urgence_lien || "",
+          date_embauche: e.date_embauche || "",
+          type_contrat: e.type_contrat || "",
+          role: e.role || "",
         }));
         if (e.poste_id != null) setPosteId(String(e.poste_id));
         if (e.departement_id != null) setDepartementId(String(e.departement_id));
+        if (e.superieur_id != null) setSuperieurId(String(e.superieur_id));
         if (e.photo_url) setPhoto(e.photo_url);
       })
       .catch(() => toast("Impossible de charger l'employé à modifier", "error"));
@@ -290,7 +336,20 @@ export default function Enrolement() {
       };
       if (posteId) payload.poste_id = Number(posteId);
       if (departementId) payload.departement_id = Number(departementId);
+      if (superieurId) payload.superieur_id = Number(superieurId);
       if (form.email.trim()) payload.email = form.email.trim();
+      if (form.telephone.trim()) payload.telephone = form.telephone.trim();
+      if (form.adresse.trim()) payload.adresse = form.adresse.trim();
+      if (form.sexe) payload.sexe = form.sexe;
+      if (form.date_naissance) payload.date_naissance = form.date_naissance;
+      if (form.nationalite.trim()) payload.nationalite = form.nationalite.trim();
+      if (form.etat_civil) payload.etat_civil = form.etat_civil;
+      if (form.contact_urgence_nom.trim()) payload.contact_urgence_nom = form.contact_urgence_nom.trim();
+      if (form.contact_urgence_tel.trim()) payload.contact_urgence_tel = form.contact_urgence_tel.trim();
+      if (form.contact_urgence_lien.trim()) payload.contact_urgence_lien = form.contact_urgence_lien.trim();
+      if (form.date_embauche) payload.date_embauche = form.date_embauche;
+      if (form.type_contrat) payload.type_contrat = form.type_contrat;
+      if (form.role) payload.role = form.role;
       if (photoUrl) payload.photo_url = photoUrl;
 
       const res = editMode
@@ -322,9 +381,16 @@ export default function Enrolement() {
   const recommencer = () => {
     setDone(false);
     setEtape(0);
-    setForm({ nom: "", fonction: "", departement: "", agence: "", email: "", badge: "", pin: "" });
+    setForm({
+      nom: "", fonction: "", departement: "", email: "", badge: "", pin: "",
+      sexe: "", date_naissance: "", nationalite: "", etat_civil: "",
+      telephone: "", adresse: "",
+      contact_urgence_nom: "", contact_urgence_tel: "", contact_urgence_lien: "",
+      date_embauche: "", type_contrat: "", role: "",
+    });
     setPosteId("");
     setDepartementId("");
+    setSuperieurId("");
     setPhoto(null);
     setPhotoFile(null);
     setCaptures(0);
@@ -463,80 +529,144 @@ export default function Enrolement() {
           <div key={etape} className="modal-in min-h-[280px] flex flex-col justify-center">
             {/* Étape 0 — Identité */}
             {etape === 0 && (
-              <div className="space-y-[22px]">
-                <div className="flex items-center gap-4">
-                  <label className="relative w-16 h-16 rounded-xl overflow-hidden cursor-pointer shrink-0 ring-1 ring-[#DAD4C5]">
-                    {photo ? (
-                      <img src={photo} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="w-full h-full bg-[#FBF9F4] flex items-center justify-center">
-                        <Icon name="add_a_photo" className="text-[#A39E90] text-[22px]" aria-hidden="true" />
-                      </span>
-                    )}
-                    <input type="file" accept="image/*" onChange={onPhoto} className="absolute inset-0 opacity-0 cursor-pointer" aria-label="Ajouter une photo d'identité" />
-                  </label>
-                  <div>
-                    <p className="text-[13.5px] font-medium text-[#2B2A27]">Photo d'identité</p>
-                    <p className="text-[12px] text-[#8C8678]">Optionnelle — elle apparaîtra sur le badge.</p>
+              <div className="space-y-6">
+                {/* 1 — Identité */}
+                <Section num="1" titre="Identité">
+                  <div className="flex items-center gap-4 mb-4">
+                    <label className="relative w-16 h-16 rounded-xl overflow-hidden cursor-pointer shrink-0 ring-1 ring-[#DAD4C5]">
+                      {photo ? (
+                        <img src={photo} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="w-full h-full bg-[#FBF9F4] flex items-center justify-center">
+                          <Icon name="add_a_photo" className="text-[#A39E90] text-[22px]" aria-hidden="true" />
+                        </span>
+                      )}
+                      <input type="file" accept="image/*" onChange={onPhoto} className="absolute inset-0 opacity-0 cursor-pointer" aria-label="Ajouter une photo d'identité" />
+                    </label>
+                    <div>
+                      <p className="text-[13.5px] font-medium text-[#2B2A27]">Photo d'identité</p>
+                      <p className="text-[12px] text-[#8C8678]">Optionnelle — elle apparaîtra sur le badge.</p>
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-[14px]">
-                  <Champ label="Nom et prénom" full>
-                    <input className={champClass} value={form.nom} onChange={set("nom")} placeholder="Ex. Jean Dupont" autoFocus />
-                  </Champ>
-                  <Champ label="Fonction">
-                    {postes.length > 0 ? (
-                      <select
-                        className={`${champClass} appearance-none`}
-                        value={posteId}
-                        onChange={(e) => {
-                          const id = e.target.value;
-                          setPosteId(id);
-                          const p = postes.find((x) => x.id === id);
-                          setForm((f) => ({ ...f, fonction: p ? p.intitule : "" }));
-                        }}
-                      >
-                        <option value="">Sélectionner une fonction</option>
-                        {postes.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.intitule}
-                          </option>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-[14px]">
+                    <Champ label="Nom et prénom *" full>
+                      <input className={champClass} value={form.nom} onChange={set("nom")} placeholder="Ex. Jean Dupont" autoFocus />
+                    </Champ>
+                    <Champ label="Sexe">
+                      <select className={`${champClass} appearance-none`} value={form.sexe} onChange={set("sexe")}>
+                        <option value="">—</option>
+                        {SEXES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </Champ>
+                    <Champ label="Date de naissance">
+                      <input type="date" className={champClass} value={form.date_naissance} onChange={set("date_naissance")} />
+                    </Champ>
+                    <Champ label="Nationalité">
+                      <input className={champClass} value={form.nationalite} onChange={set("nationalite")} placeholder="Ex. Congolaise" />
+                    </Champ>
+                    <Champ label="État civil">
+                      <select className={`${champClass} appearance-none`} value={form.etat_civil} onChange={set("etat_civil")}>
+                        <option value="">—</option>
+                        {ETATS_CIVILS.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </Champ>
+                  </div>
+                </Section>
+
+                {/* 2 — Coordonnées */}
+                <Section num="2" titre="Coordonnées">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-[14px]">
+                    <Champ label="Téléphone">
+                      <input className={champClass} value={form.telephone} onChange={set("telephone")} placeholder="Ex. +242 06 000 0000" inputMode="tel" />
+                    </Champ>
+                    <Champ label="Email professionnel">
+                      <input className={champClass} value={form.email} onChange={set("email")} placeholder="prenom.nom@madmen.io" />
+                    </Champ>
+                    <Champ label="Adresse" full>
+                      <input className={champClass} value={form.adresse} onChange={set("adresse")} placeholder="Ex. 12 av. de la Paix, Brazzaville" />
+                    </Champ>
+                    <Champ label="Contact d'urgence — nom">
+                      <input className={champClass} value={form.contact_urgence_nom} onChange={set("contact_urgence_nom")} placeholder="Ex. Marie Dupont" />
+                    </Champ>
+                    <Champ label="Contact d'urgence — téléphone">
+                      <input className={champClass} value={form.contact_urgence_tel} onChange={set("contact_urgence_tel")} placeholder="Ex. +242 05 000 0000" inputMode="tel" />
+                    </Champ>
+                    <Champ label="Lien de parenté" full>
+                      <input className={champClass} value={form.contact_urgence_lien} onChange={set("contact_urgence_lien")} placeholder="Ex. Conjoint, Parent, Ami…" />
+                    </Champ>
+                  </div>
+                </Section>
+
+                {/* 3 — Poste & contrat */}
+                <Section num="3" titre="Poste & contrat">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-[14px]">
+                    <Champ label="Fonction">
+                      {postes.length > 0 ? (
+                        <select
+                          className={`${champClass} appearance-none`}
+                          value={posteId}
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            setPosteId(id);
+                            const p = postes.find((x) => x.id === id);
+                            setForm((f) => ({ ...f, fonction: p ? p.intitule : "" }));
+                          }}
+                        >
+                          <option value="">Sélectionner une fonction</option>
+                          {postes.map((p) => (
+                            <option key={p.id} value={p.id}>{p.intitule}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input className={champClass} value={form.fonction} onChange={set("fonction")} placeholder="Ex. Comptable" />
+                      )}
+                    </Champ>
+                    <Champ label="Département">
+                      {departements.length > 0 ? (
+                        <select
+                          className={`${champClass} appearance-none`}
+                          value={departementId}
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            setDepartementId(id);
+                            const d = departements.find((x) => x.id === id);
+                            setForm((f) => ({ ...f, departement: d ? d.nom : "" }));
+                          }}
+                        >
+                          <option value="">Sélectionner un département</option>
+                          {departements.map((d) => (
+                            <option key={d.id} value={d.id}>{d.nom}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input className={champClass} value={form.departement} onChange={set("departement")} placeholder="Ex. Finance" />
+                      )}
+                    </Champ>
+                    <Champ label="Supérieur hiérarchique">
+                      <select className={`${champClass} appearance-none`} value={superieurId} onChange={(e) => setSuperieurId(e.target.value)}>
+                        <option value="">— Aucun</option>
+                        {superieurs.filter((s) => s.id !== String(editId)).map((s) => (
+                          <option key={s.id} value={s.id}>{s.nom}</option>
                         ))}
                       </select>
-                    ) : (
-                      <input className={champClass} value={form.fonction} onChange={set("fonction")} placeholder="Ex. Comptable" />
-                    )}
-                  </Champ>
-                  <Champ label="Département">
-                    {departements.length > 0 ? (
-                      <select
-                        className={`${champClass} appearance-none`}
-                        value={departementId}
-                        onChange={(e) => {
-                          const id = e.target.value;
-                          setDepartementId(id);
-                          const d = departements.find((x) => x.id === id);
-                          setForm((f) => ({ ...f, departement: d ? d.nom : "" }));
-                        }}
-                      >
-                        <option value="">Sélectionner un département</option>
-                        {departements.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.nom}
-                          </option>
-                        ))}
+                    </Champ>
+                    <Champ label="Date d'embauche">
+                      <input type="date" className={champClass} value={form.date_embauche} onChange={set("date_embauche")} />
+                    </Champ>
+                    <Champ label="Type de contrat">
+                      <select className={`${champClass} appearance-none`} value={form.type_contrat} onChange={set("type_contrat")}>
+                        <option value="">—</option>
+                        {TYPES_CONTRAT.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
-                    ) : (
-                      <input className={champClass} value={form.departement} onChange={set("departement")} placeholder="Ex. Finance" />
-                    )}
-                  </Champ>
-                  <Champ label="Agence">
-                    <input className={champClass} value={form.agence} onChange={set("agence")} placeholder="Ex. Siège Social" />
-                  </Champ>
-                  <Champ label="Email professionnel">
-                    <input className={champClass} value={form.email} onChange={set("email")} placeholder="prenom.nom@madmen.io" />
-                  </Champ>
-                </div>
+                    </Champ>
+                    <Champ label="Rôle">
+                      <select className={`${champClass} appearance-none`} value={form.role || "employe"} onChange={set("role")}>
+                        {ROLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                        {form.role === "super_admin" && <option value="super_admin">Super admin</option>}
+                      </select>
+                    </Champ>
+                  </div>
+                </Section>
               </div>
             )}
 
@@ -647,12 +777,13 @@ export default function Enrolement() {
                 <div className="rounded-[12px] border border-[#E6E1D4] divide-y divide-[#E6E1D4] overflow-hidden">
                   {[
                     ["Nom et prénom", form.nom, false, false],
+                    ["Téléphone", form.telephone, false, false],
                     ["Fonction", form.fonction, false, false],
                     ["Département", form.departement, false, false],
-                    ["Agence", form.agence, false, false],
+                    ["Type de contrat", form.type_contrat, false, false],
+                    ["Date d'embauche", form.date_embauche, false, false],
+                    ["Contact d'urgence", form.contact_urgence_nom ? `${form.contact_urgence_nom}${form.contact_urgence_tel ? ` · ${form.contact_urgence_tel}` : ""}` : "", false, false],
                     ["Empreinte", empreinteOk ? "Enregistrée (3 passages)" : "Non capturée", false, empreinteOk],
-                    ["Badge RFID", form.badge, true, false],
-                    ["Code PIN", form.pin ? "••••" : "", true, false],
                   ].map(([k, v, mono, ok]) => (
                     <div key={k} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
                       <span className="text-[13px] text-[#6F6B60]">{k}</span>
