@@ -11,6 +11,7 @@ import ProfilDetails from "./pages/ProfilDetails.jsx";
 import Paiement from "./pages/Paiement.jsx";
 import Pointages from "./pages/Pointages.jsx";
 import PointageHoraires from "./pages/PointageHoraires.jsx";
+import JoursFeries from "./pages/JoursFeries.jsx";
 import Enrolement from "./pages/Enrolement.jsx";
 import Presence from "./pages/Presence.jsx";
 import Activite from "./pages/Activite.jsx";
@@ -55,6 +56,7 @@ export default function App() {
             <Route path="presence" element={<Presence />} />
             <Route path="pointage-horaires" element={<PointageHoraires />} />
             <Route path="pointage-horaires/:matricule" element={<PointageHoraires />} />
+            <Route path="jours-feries" element={<JoursFeries />} />
             <Route path="activite" element={<Activite />} />
             <Route path="productivite" element={<Productivite />} />
             <Route path="finance" element={<Finance />} />
