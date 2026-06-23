@@ -6,14 +6,55 @@ import Icon from "../components/ui/Icon.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { apiGet } from "../lib/api.js";
 
-const EVENEMENTS = [
-  { id: 1, agent: "Karim Benali", action: "Pointage — entrée", appareil: "ZKTeco K40", heure: "08:42", icon: "login", bg: "bg-emerald-50 text-emerald-600" },
-  { id: 2, agent: "Elena Vance", action: "Reconnaissance faciale", appareil: "Watchman", heure: "08:39", icon: "face", bg: "bg-or-100 text-or-700" },
-  { id: 3, agent: "Sarah Jenkins", action: "Pointage — entrée", appareil: "ZKTeco K40", heure: "08:35", icon: "login", bg: "bg-emerald-50 text-emerald-600" },
-  { id: 4, agent: "Inconnu", action: "Échec de reconnaissance", appareil: "Watchman", heure: "08:31", icon: "error", bg: "bg-rose-50 text-rose-600" },
-  { id: 5, agent: "Marcus Thorne", action: "Pointage — entrée", appareil: "ZKTeco K40", heure: "08:28", icon: "login", bg: "bg-emerald-50 text-emerald-600" },
-  { id: 6, agent: "Amélie Dubois", action: "Reconnaissance faciale", appareil: "Watchman", heure: "08:24", icon: "face", bg: "bg-or-100 text-or-700" },
-];
+// Formate un horodatage SQL (YYYY-MM-DD HH:MM:SS) en heure courte "HH:MM".
+// Renvoie une valeur neutre si le format est inattendu plutôt que de planter.
+function formatHeure(ts) {
+  if (!ts || typeof ts !== "string") return "—";
+  const m = ts.match(/(\d{2}):(\d{2})/);
+  return m ? `${m[1]}:${m[2]}` : "—";
+}
+
+// Incident d'inactivité API
+// {id, employe, heure_verrouillage, heure_reprise, duree_minutes, motif, justification, statut}
+// -> événement attendu par le rendu {id, agent, action, appareil, heure, icon, bg}.
+// L'API ne renvoie pas le nom d'appareil : les incidents proviennent des postes
+// WatchMEN, on l'indique de façon neutre sans inventer de référence matérielle.
+function mapEvenement(i) {
+  const statut = (i.statut || "").toLowerCase();
+  const motif = i.motif || "Inactivité";
+  const repris = i.heure_reprise != null;
+
+  // Action lisible : verrouillage / reprise + motif, durée si connue.
+  let action;
+  if (repris) {
+    const duree = Number(i.duree_minutes) > 0 ? ` (${i.duree_minutes} min)` : "";
+    action = `Reprise — ${motif}${duree}`;
+  } else {
+    action = `Verrouillage poste — ${motif}`;
+  }
+
+  // Icône/couleur selon l'état de l'incident.
+  let icon = "lock";
+  let bg = "bg-amber-50 text-amber-600";
+  if (repris) {
+    icon = "lock_open";
+    bg = "bg-emerald-50 text-emerald-600";
+  } else if (statut === "non_justifie" || statut === "rejete") {
+    icon = "error";
+    bg = "bg-rose-50 text-rose-600";
+  }
+
+  return {
+    id: i.id,
+    agent: i.employe || "Agent inconnu",
+    action,
+    appareil: "Poste WatchMEN",
+    // L'événement le plus pertinent : reprise si elle existe, sinon verrouillage.
+    heure: formatHeure(repris ? i.heure_reprise : i.heure_verrouillage),
+    icon,
+    bg,
+  };
+}
 
 // Choix de l'icône/couleur de carte selon le type d'appareil renvoyé par l'API.
 function styleType(type) {
@@ -98,12 +139,27 @@ export default function Appareils({ embedded = false }) {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
 
+  // Activité récente des appareils : les incidents d'inactivité remontés par les
+  // postes WatchMEN (GET /api/incidents, triés du plus récent au plus ancien).
+  const [evenements, setEvenements] = useState([]);
+  const [evChargement, setEvChargement] = useState(true);
+  const [evErreur, setEvErreur] = useState(false);
+
   // Données RÉELLES depuis l'API (remplace les mocks de src/data).
   useEffect(() => {
     apiGet("/api/appareils")
       .then((data) => setAppareils((Array.isArray(data) ? data : []).map(mapAppareil)))
       .catch((e) => setErreur(e?.message || "Erreur de chargement"))
       .finally(() => setChargement(false));
+  }, []);
+
+  // Événements récents : dégradation gracieuse — en cas d'erreur/404, on affiche
+  // un état vide neutre plutôt que de casser la page (l'API est en prod).
+  useEffect(() => {
+    apiGet("/api/incidents?limit=8")
+      .then((data) => setEvenements((Array.isArray(data) ? data : []).map(mapEvenement)))
+      .catch(() => setEvErreur(true))
+      .finally(() => setEvChargement(false));
   }, []);
 
   const actions = (
@@ -141,18 +197,30 @@ export default function Appareils({ embedded = false }) {
             <p className="text-xs text-muted">Derniers événements remontés par le K40 et le Watchman.</p>
           </div>
         </div>
-        <div className="divide-y divide-border">
-          {EVENEMENTS.map((e) => (
-            <div key={e.id} className="flex items-center gap-3 px-5 py-3">
-              <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${e.bg}`}><Icon name={e.icon} className="text-[18px]" filled /></span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-ink truncate">{e.agent} <span className="text-muted font-normal">· {e.action}</span></p>
-                <p className="text-xs text-subtle">{e.appareil}</p>
+        {evChargement ? (
+          <div className="px-5 py-10 text-center">
+            <Icon name="progress_activity" className="text-faint text-[28px] animate-spin" />
+            <p className="mt-2 text-xs text-muted">Chargement de l'activité…</p>
+          </div>
+        ) : evErreur || evenements.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <Icon name="history_toggle_off" className="text-faint text-[28px]" />
+            <p className="mt-2 text-xs text-muted">Aucune activité récente à afficher.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {evenements.map((e) => (
+              <div key={e.id} className="flex items-center gap-3 px-5 py-3">
+                <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${e.bg}`}><Icon name={e.icon} className="text-[18px]" filled /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-ink truncate">{e.agent} <span className="text-muted font-normal">· {e.action}</span></p>
+                  <p className="text-xs text-subtle">{e.appareil}</p>
+                </div>
+                <span className="text-xs text-subtle tabular-nums shrink-0">{e.heure}</span>
               </div>
-              <span className="text-xs text-subtle tabular-nums shrink-0">{e.heure}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </>
   );

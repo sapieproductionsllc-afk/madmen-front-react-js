@@ -6,7 +6,7 @@ import Avatar from "../components/ui/Avatar.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import { Input, Select, Field, champClass } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet } from "../lib/api.js";
+import { apiGet, apiPost } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/120?u=${encodeURIComponent(id)}`;
@@ -14,6 +14,22 @@ const photoDe = (id) => `https://i.pravatar.cc/120?u=${encodeURIComponent(id)}`;
 const ICONE_TYPE = { "Congé": "event", Permission: "schedule", "Avance sur salaire": "payments", Avance: "payments", Absence: "report", Autre: "description" };
 const TONE_STATUT = { "En attente": "amber", "Approuvée": "emerald", "Refusée": "rose" };
 const TYPES = ["Congé", "Permission", "Avance sur salaire", "Autre"];
+
+// Label FR du formulaire -> 'type' attendu par l'API (DemandeController::TYPES).
+const TYPE_API = {
+  "Congé": "conge",
+  Permission: "permission",
+  "Avance sur salaire": "avance",
+  Avance: "avance",
+  Absence: "absence",
+  Autre: "autre",
+};
+
+// Décision front -> corps API attendu par POST /api/demandes/{id}/decision.
+const DECISION_API = { "Approuvée": "approuve", "Refusée": "refuse" };
+
+// Extrait les dates YYYY-MM-DD présentes dans le champ libre « Période / Date ».
+const datesDuTexte = (s) => (String(s || "").match(/\d{4}-\d{2}-\d{2}/g) || []);
 
 // Traduit le statut renvoyé par l'API vers les libellés attendus par le front.
 const STATUT_API = {
@@ -32,11 +48,18 @@ const mapPeriode = (d) => {
 };
 
 // Demande API -> forme attendue par le JSX (champs identiques au mock).
+// Type API -> libellé FR affiché (icône/badge). Inverse partiel de TYPE_API.
+const TYPE_LABEL = {
+  conge: "Congé", permission: "Permission", avance: "Avance sur salaire",
+  absence: "Absence", formation: "Autre", attestation: "Autre", autre: "Autre",
+};
+
 function mapDemande(d) {
   return {
-    id: d.reference || d.id, // identifiant métier (ex. DM-201) ; fallback id numérique
+    id: d.reference || d.id, // identifiant métier affiché (ex. #0001) ; fallback id numérique
+    _id: d.id, // id numérique : requis par /api/demandes/{id}/decision
     employeId: d.matricule || "", // lookup vers l'employé (indexé par matricule)
-    type: d.type || "Autre",
+    type: TYPE_LABEL[d.type] || "Autre",
     periode: mapPeriode(d),
     motif: d.objet || "", // `objet` API = motif affiché
     statut: mapStatut(d.statut),
@@ -82,20 +105,70 @@ export default function Demandes({ embedded = false }) {
   const compte = (k) => (k === "Toutes" ? liste.length : liste.filter((d) => d.statut === k).length);
   const filtre = useMemo(() => (cat === "Toutes" ? liste : liste.filter((d) => d.statut === cat)), [liste, cat]);
 
-  const decider = (id, statut) => {
+  const decider = async (id, statut) => {
+    const cible = liste.find((d) => d.id === id);
+    const ancien = cible?.statut ?? "En attente";
+
+    // Optimistic UI : on bascule tout de suite.
     setListe((prev) => prev.map((d) => (d.id === id ? { ...d, statut } : d)));
+
+    // Retour « En attente » : non supporté par l'API (pas d'endpoint) -> reste local.
     if (statut === "En attente") return toast("Demande remise en attente.", "info");
-    toast(`Demande ${statut === "Approuvée" ? "approuvée" : "refusée"}.`, statut === "Approuvée" ? "success" : "info");
+
+    const decision = DECISION_API[statut];
+    const idApi = cible?._id; // id numérique requis par l'API
+    if (!decision || idApi == null) {
+      return toast(`Demande ${statut === "Approuvée" ? "approuvée" : "refusée"}.`, statut === "Approuvée" ? "success" : "info");
+    }
+    try {
+      await apiPost(`/api/demandes/${idApi}/decision`, { decision });
+      toast(`Demande ${statut === "Approuvée" ? "approuvée" : "refusée"}.`, statut === "Approuvée" ? "success" : "info");
+    } catch (err) {
+      // Rollback : on rétablit l'ancien statut et on signale l'échec.
+      setListe((prev) => prev.map((d) => (d.id === id ? { ...d, statut: ancien } : d)));
+      toast(err?.message || "Échec de l'enregistrement de la décision.", "error");
+    }
   };
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!agent) return toast("Sélectionnez un agent", "info");
     if (!motif.trim()) return toast("Veuillez préciser le motif", "info");
-    setListe((prev) => [{ id: `DM-${compteur}`, employeId: agent, type, periode: periode.trim() || "—", motif: motif.trim(), statut: "En attente", soumisLe: "Aujourd'hui" }, ...prev]);
+
+    const emp = empById[agent];
+    if (!emp?._id) return toast("Agent introuvable", "error");
+
+    // Construit le corps attendu par POST /api/demandes (création au nom d'un agent).
+    const typeApi = TYPE_API[type] || "autre";
+    const body = { employe_id: emp._id, type: typeApi, objet: motif.trim() };
+    const [d1, d2] = datesDuTexte(periode);
+    if (d1) body.date_debut = d1;
+    if (d2 || d1) body.date_fin = d2 || d1; // une seule date -> début = fin
+    if (typeApi === "avance") {
+      const m = parseFloat(String(periode).replace(/[^\d.,]/g, "").replace(",", "."));
+      if (!Number.isNaN(m) && m > 0) body.montant = m;
+    }
+
+    // Ligne provisoire (optimistic) en tête de liste.
+    const tempId = `tmp-${compteur}`;
+    const provisoire = { id: tempId, _id: null, employeId: agent, type, periode: periode.trim() || "—", motif: motif.trim(), statut: "En attente", soumisLe: "Aujourd'hui" };
+    setListe((prev) => [provisoire, ...prev]);
     setCompteur((n) => n + 1);
-    toast("Demande enregistrée (en attente)", "success");
     setType("Congé"); setPeriode(""); setMotif("");
+
+    try {
+      const cree = await apiPost("/api/demandes", body);
+      // La réponse de création n'inclut pas le matricule (pas de JOIN) :
+      // on le réinjecte pour conserver l'avatar/nom de l'agent dans la carte.
+      const ligne = { ...mapDemande(cree), employeId: mapDemande(cree).employeId || agent };
+      // Remplace la ligne provisoire par la demande réellement créée.
+      setListe((prev) => prev.map((d) => (d.id === tempId ? ligne : d)));
+      toast("Demande enregistrée (en attente)", "success");
+    } catch (err) {
+      // Rollback : on retire la ligne provisoire et on signale l'échec.
+      setListe((prev) => prev.filter((d) => d.id !== tempId));
+      toast(err?.message || "Échec de l'enregistrement de la demande.", "error");
+    }
   }
 
   return (

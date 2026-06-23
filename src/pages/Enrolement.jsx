@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
+import { apiGet, apiPost, apiUpload } from "../lib/api.js";
 
 /* ============================================================================
    MADMEN — Enrôlement biométrique (écran « vitrine », brief premium).
@@ -126,23 +127,60 @@ export default function Enrolement() {
   const navigate = useNavigate();
   const [etape, setEtape] = useState(0);
   const [form, setForm] = useState({ nom: "", fonction: "", departement: "", agence: "", email: "", badge: "", pin: "" });
-  const [photo, setPhoto] = useState(null);
+  // poste_id / departement_id sélectionnés (FK envoyées à l'API).
+  const [posteId, setPosteId] = useState("");
+  const [departementId, setDepartementId] = useState("");
+  const [photo, setPhoto] = useState(null); // aperçu (data URL) pour le badge
+  const [photoFile, setPhotoFile] = useState(null); // fichier brut à téléverser
   const [captures, setCaptures] = useState(0);
   const [scanning, setScanning] = useState(false);
   const [atteste, setAtteste] = useState(false);
   const [done, setDone] = useState(false);
+  const [enregistre, setEnregistre] = useState(false); // création API en cours
+  // Listes alimentant les <select> (postes/départements), dérivées de l'API.
+  const [postes, setPostes] = useState([]);
+  const [departements, setDepartements] = useState([]);
+  // Résultat réel renvoyé par l'API après création (matricule + PIN générés).
+  const [cree, setCree] = useState(null);
+
+  // Au montage : on tente d'alimenter les <select> à partir des données réelles.
+  // GET /api/config/postes ne renvoie que des seuils (pas une liste) : on dérive
+  // donc les postes/départements de la liste des employés. Dégradation gracieuse :
+  // toute erreur laisse simplement les listes vides (saisie texte de repli).
+  useEffect(() => {
+    let actif = true;
+    (async () => {
+      try {
+        const employes = await apiGet("/api/employes");
+        if (!actif || !Array.isArray(employes)) return;
+        const pMap = new Map();
+        const dMap = new Map();
+        for (const e of employes) {
+          if (e.poste_id != null && e.poste_libelle) pMap.set(String(e.poste_id), e.poste_libelle);
+          if (e.departement_id != null && e.departement_nom) dMap.set(String(e.departement_id), e.departement_nom);
+        }
+        setPostes([...pMap].map(([id, intitule]) => ({ id, intitule })).sort((a, b) => a.intitule.localeCompare(b.intitule)));
+        setDepartements([...dMap].map(([id, nom]) => ({ id, nom })).sort((a, b) => a.nom.localeCompare(b.nom)));
+      } catch {
+        /* API indisponible : on garde les listes vides, saisie texte de repli */
+      }
+    })();
+    return () => {
+      actif = false;
+    };
+  }, []);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const empreinteOk = captures >= 3;
   const pct = Math.round(((etape + 1) / 4) * 100);
   const pinValide = /^\d{4}$/.test(form.pin);
-  const matricule = form.nom.trim()
-    ? `AUR-${String(1000 + ((form.nom.length * 31 + form.fonction.length * 7) % 9000))}`
-    : "AUR-————";
+  // Matricule affiché : le VRAI renvoyé par l'API une fois créé, sinon un placeholder.
+  const matricule = cree?.matricule || (form.nom.trim() ? "AUR-…" : "AUR-————");
 
   const onPhoto = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = () => setPhoto(reader.result);
     reader.readAsDataURL(file);
@@ -162,17 +200,64 @@ export default function Enrolement() {
 
   const suivant = () => etapeValide && setEtape((e) => Math.min(e + 1, 3));
   const precedent = () => setEtape((e) => Math.max(e - 1, 0));
-  const terminer = () => {
-    setDone(true);
-    toast(`${form.nom} a été enrôlé avec succès`);
+
+  // Création RÉELLE de l'employé. Sépare « nom complet » en prénom + nom, téléverse
+  // la photo si présente, puis POST /api/employes. Le PIN et le matricule sont
+  // générés côté serveur : on affiche ceux renvoyés (code_pin_genere, matricule).
+  const terminer = async () => {
+    if (!atteste || enregistre) return;
+    setEnregistre(true);
+
+    // « Jean Dupont » -> prenom: "Jean", nom: "Dupont" (dernier mot = nom de famille).
+    const morceaux = form.nom.trim().split(/\s+/).filter(Boolean);
+    const nom = morceaux.length > 1 ? morceaux.pop() : (morceaux[0] || "");
+    const prenom = morceaux.join(" ") || nom;
+
+    try {
+      // Téléversement optionnel de la photo (best-effort : un échec n'empêche pas
+      // la création de l'employé, on continue sans photo_url).
+      let photoUrl = null;
+      if (photoFile) {
+        try {
+          const up = await apiUpload("/api/fichiers", photoFile);
+          photoUrl = up?.url || null;
+        } catch {
+          toast("Photo non téléversée — l'employé sera créé sans photo", "info");
+        }
+      }
+
+      const payload = {
+        nom,
+        prenom,
+        statut: "actif",
+      };
+      if (posteId) payload.poste_id = Number(posteId);
+      if (departementId) payload.departement_id = Number(departementId);
+      if (form.email.trim()) payload.email = form.email.trim();
+      if (photoUrl) payload.photo_url = photoUrl;
+
+      const res = await apiPost("/api/employes", payload);
+      setCree(res || {});
+      setDone(true);
+      toast(`${form.nom.trim()} a été enrôlé avec succès`);
+    } catch (err) {
+      toast(err?.message || "Échec de la création de l'employé", "error");
+    } finally {
+      setEnregistre(false);
+    }
   };
+
   const recommencer = () => {
     setDone(false);
     setEtape(0);
     setForm({ nom: "", fonction: "", departement: "", agence: "", email: "", badge: "", pin: "" });
+    setPosteId("");
+    setDepartementId("");
     setPhoto(null);
+    setPhotoFile(null);
     setCaptures(0);
     setAtteste(false);
+    setCree(null);
   };
 
   const Ambiance = (
@@ -203,11 +288,17 @@ export default function Enrolement() {
             <p className="text-[13px] text-white/[0.68] mt-1.5">
               Matricule <span className="font-mono text-white">{matricule}</span> · l'employé peut désormais pointer.
             </p>
+            {cree?.code_pin_genere && (
+              <p className="text-[12px] text-white/[0.68] mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/[0.1] ring-1 ring-white/15 px-3 py-1.5">
+                <Icon name="key" filled className="text-[#E7C173] text-[14px]" aria-hidden="true" />
+                Code PIN généré : <span className="font-mono text-white tracking-[0.18em]">{cree.code_pin_genere}</span> — à communiquer à l'employé (visible une seule fois).
+              </p>
+            )}
           </div>
         </div>
 
         <div className="mx-auto w-full max-w-xs -mt-8 relative">
-          <BadgeEmploye form={form} photo={photo} empreinteOk={empreinteOk} matricule={matricule} pin={form.pin} />
+          <BadgeEmploye form={form} photo={photo} empreinteOk={empreinteOk} matricule={matricule} pin={cree?.code_pin_genere || form.pin} />
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3 mt-7">
@@ -318,10 +409,50 @@ export default function Enrolement() {
                     <input className={champClass} value={form.nom} onChange={set("nom")} placeholder="Ex. Jean Dupont" autoFocus />
                   </Champ>
                   <Champ label="Fonction">
-                    <input className={champClass} value={form.fonction} onChange={set("fonction")} placeholder="Ex. Comptable" />
+                    {postes.length > 0 ? (
+                      <select
+                        className={`${champClass} appearance-none`}
+                        value={posteId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setPosteId(id);
+                          const p = postes.find((x) => x.id === id);
+                          setForm((f) => ({ ...f, fonction: p ? p.intitule : "" }));
+                        }}
+                      >
+                        <option value="">Sélectionner une fonction</option>
+                        {postes.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.intitule}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input className={champClass} value={form.fonction} onChange={set("fonction")} placeholder="Ex. Comptable" />
+                    )}
                   </Champ>
                   <Champ label="Département">
-                    <input className={champClass} value={form.departement} onChange={set("departement")} placeholder="Ex. Finance" />
+                    {departements.length > 0 ? (
+                      <select
+                        className={`${champClass} appearance-none`}
+                        value={departementId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setDepartementId(id);
+                          const d = departements.find((x) => x.id === id);
+                          setForm((f) => ({ ...f, departement: d ? d.nom : "" }));
+                        }}
+                      >
+                        <option value="">Sélectionner un département</option>
+                        {departements.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.nom}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input className={champClass} value={form.departement} onChange={set("departement")} placeholder="Ex. Finance" />
+                    )}
                   </Champ>
                   <Champ label="Agence">
                     <input className={champClass} value={form.agence} onChange={set("agence")} placeholder="Ex. Siège Social" />
@@ -478,11 +609,11 @@ export default function Enrolement() {
             ) : (
               <button
                 onClick={terminer}
-                disabled={!atteste}
+                disabled={!atteste || enregistre}
                 className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[9px] bg-[#1E7D67] text-white text-[13.5px] font-medium shadow-[0_6px_16px_-6px_rgba(30,125,103,0.5)] transition hover:bg-[#1C5C50] active:translate-y-px disabled:bg-[#A39E90] disabled:shadow-none disabled:cursor-not-allowed"
               >
-                <Icon name="check" className="text-[16px]" aria-hidden="true" />
-                Terminer l'enrôlement
+                <Icon name={enregistre ? "progress_activity" : "check"} className={`text-[16px] ${enregistre ? "animate-spin" : ""}`} aria-hidden="true" />
+                {enregistre ? "Enrôlement en cours…" : "Terminer l'enrôlement"}
               </button>
             )}
           </div>

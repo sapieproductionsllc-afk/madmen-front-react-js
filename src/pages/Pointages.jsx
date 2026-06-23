@@ -11,7 +11,13 @@ import { mapEmploye } from "../lib/mappers.js";
 const photoDe = (id) => `https://i.pravatar.cc/160?u=${encodeURIComponent(id)}`;
 const STATUTS = ["Présent", "Retard", "Absent", "Congé"];
 const TONE_TXT = { Présent: "text-emerald-600", Retard: "text-amber-600", Absent: "text-rose-600", Congé: "text-sky-600" };
-const PCT_INIT = { Présent: 100, Retard: 90, Absent: 0, Congé: 0 };
+// Présence effective attendue sur une journée standard : 08:30→18:00 moins 1h de
+// pause déjeuner = 8h = 480 min (cf. config/presence.php côté API). Sert de base
+// au calcul du % de travail (minutes travaillées / minutes attendues).
+const MIN_ATTENDUES = 480;
+// Repli quand l'API ne renvoie pas de temps travaillé (donnée partielle) : on
+// évite d'afficher 0% à tort pour un présent/retard sans minutes calculées.
+const PCT_REPLI = { Présent: 100, Retard: 90, Absent: 0, Congé: 0 };
 const MOIS_AB = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const MOIS_LONG = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 const PERIODES = ["Jour", "Semaine", "Mois", "Année"];
@@ -26,6 +32,17 @@ const heure = (dt) => (dt ? String(dt).slice(11, 16) : "--:--");
 // minutes -> 'Xh MM' ; '—' si rien.
 const dureeHm = (min) => (min && min > 0 ? `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}` : "—");
 
+// % de travail calculé depuis les données API : minutes travaillées
+// (temps_present_minutes, déjà borné par l'horaire côté API) / minutes attendues.
+// Repli sur le statut si l'API ne renvoie pas de temps exploitable.
+function pourcentageDe(p, statut) {
+  const min = Number(p.temps_present_minutes);
+  if (Number.isFinite(min) && min > 0) {
+    return Math.max(0, Math.min(100, Math.round((min / MIN_ATTENDUES) * 100)));
+  }
+  return PCT_REPLI[statut] ?? 0;
+}
+
 // Pointage API -> ligne attendue par le JSX (mêmes champs que le mock).
 function mapPointage(p) {
   const statut = STATUT_API[p.statut] || "Absent";
@@ -37,7 +54,7 @@ function mapPointage(p) {
     depart: heure(p.heure_sortie),
     temps: dureeHm(p.temps_present_minutes),
     statut,
-    pourcentage: PCT_INIT[statut] ?? 100,
+    pourcentage: pourcentageDe(p, statut),
   };
 }
 

@@ -4,6 +4,7 @@ import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import { Input, Select, Field as Champ } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
+import { apiGet, apiPut } from "../lib/api.js";
 
 const CLE = "madmen_parametres";
 const DEFAULTS = {
@@ -22,10 +23,22 @@ const DEFAULTS = {
   securite: { twoFA: true, masquerSalaires: true, audit: true },
 };
 
+// Fusionne une source partielle (localStorage ou API) avec les valeurs par défaut,
+// en préservant les sous-objets notifs/securite.
+function fusionner(src) {
+  if (!src || typeof src !== "object") return DEFAULTS;
+  return {
+    ...DEFAULTS,
+    ...src,
+    notifs: { ...DEFAULTS.notifs, ...(src.notifs || {}) },
+    securite: { ...DEFAULTS.securite, ...(src.securite || {}) },
+  };
+}
+
 function charger() {
   try {
     const s = JSON.parse(localStorage.getItem(CLE) || "null");
-    return s ? { ...DEFAULTS, ...s, notifs: { ...DEFAULTS.notifs, ...s.notifs }, securite: { ...DEFAULTS.securite, ...s.securite } } : DEFAULTS;
+    return s ? fusionner(s) : DEFAULTS;
   } catch {
     return DEFAULTS;
   }
@@ -71,6 +84,26 @@ export default function Parametres({ embedded = false, onDirty }) {
   const { toast } = useUI();
   const [saved, setSaved] = useState(charger);
   const [params, setParams] = useState(saved);
+  const [chargement, setChargement] = useState(true);
+  const [sauvegarde, setSauvegarde] = useState(false);
+
+  // Au montage : GET /api/parametres pour préremplir le formulaire.
+  // Dégradation gracieuse : en cas d'erreur/404, on conserve les valeurs locales (localStorage/DEFAULTS).
+  useEffect(() => {
+    let actif = true;
+    apiGet("/api/parametres")
+      .then((data) => {
+        if (!actif) return;
+        if (data && typeof data === "object" && Object.keys(data).length) {
+          const fusionne = fusionner(data);
+          setSaved(fusionne);
+          setParams(fusionne);
+        }
+      })
+      .catch(() => { /* API indisponible — on garde les valeurs locales */ })
+      .finally(() => { if (actif) setChargement(false); });
+    return () => { actif = false; };
+  }, []);
 
   const dirty = JSON.stringify(params) !== JSON.stringify(saved);
   useEffect(() => { onDirty?.(dirty); }, [dirty, onDirty]);
@@ -79,16 +112,35 @@ export default function Parametres({ embedded = false, onDirty }) {
   const setNotif = (k, v) => setParams((p) => ({ ...p, notifs: { ...p.notifs, [k]: v } }));
   const setSecu = (k, v) => setParams((p) => ({ ...p, securite: { ...p.securite, [k]: v } }));
 
-  const enregistrer = () => {
+  const enregistrer = async () => {
+    setSauvegarde(true);
+    // Fallback local immédiat (mode hors-ligne).
     try { localStorage.setItem(CLE, JSON.stringify(params)); } catch { /* stockage indisponible */ }
-    setSaved(params);
-    toast("Paramètres enregistrés", "success");
+    try {
+      const data = await apiPut("/api/parametres", params);
+      // PUT renvoie l'état complet rechargé : on resynchronise si disponible.
+      const fusionne = (data && typeof data === "object" && Object.keys(data).length) ? fusionner(data) : params;
+      setSaved(fusionne);
+      setParams(fusionne);
+      toast("Paramètres enregistrés", "success");
+    } catch {
+      // API indisponible : on garde la sauvegarde locale sans planter.
+      setSaved(params);
+      toast("Paramètres enregistrés localement (API indisponible)", "info");
+    } finally {
+      setSauvegarde(false);
+    }
   };
   const reinitialiser = () => { setParams(saved); toast("Modifications annulées", "info"); };
 
   return (
     <div className="pb-2">
-      {!embedded && <PageHeader title="Paramètres" subtitle="Configuration générale de l'entreprise." />}
+      {!embedded && (
+        <PageHeader
+          title="Paramètres"
+          subtitle={chargement ? "Chargement de la configuration…" : "Configuration générale de l'entreprise."}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Section icon="business" title="Entreprise" desc="Informations générales de l'organisation.">
@@ -153,8 +205,8 @@ export default function Parametres({ embedded = false, onDirty }) {
             </span>
             <span className="w-px h-5 bg-border hidden sm:block" />
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" icon="undo" onClick={reinitialiser}>Réinitialiser</Button>
-              <Button variant="primary" size="sm" icon="save" onClick={enregistrer}>Enregistrer</Button>
+              <Button variant="ghost" size="sm" icon="undo" onClick={reinitialiser} disabled={sauvegarde}>Réinitialiser</Button>
+              <Button variant="primary" size="sm" icon="save" onClick={enregistrer} disabled={sauvegarde}>{sauvegarde ? "Enregistrement…" : "Enregistrer"}</Button>
             </div>
           </div>
         </div>

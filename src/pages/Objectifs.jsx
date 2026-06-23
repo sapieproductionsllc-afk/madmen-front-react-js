@@ -7,7 +7,7 @@ import Avatar from "../components/ui/Avatar.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import Modal from "../components/ui/Modal.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet } from "../lib/api.js";
+import { apiGet, apiPost, apiPut, apiDelete } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/80?u=${encodeURIComponent(id)}`;
@@ -26,6 +26,11 @@ const STATUTS = ["En cours", "Atteint", "En retard"];
 // Traduction des valeurs API -> libellés attendus par le JSX (catégories/statuts).
 const CATEGORIE_API = { performance: "Performance", formation: "Formation", perso: "Développement personnel" };
 const STATUT_API = { en_cours: "En cours", atteint: "Atteint", abandonne: "En retard" };
+
+// Traduction inverse libellés JSX -> valeurs acceptées par l'API.
+// L'API ne connaît pas "Présence" -> repli sur "performance" pour ne pas être rejeté (422).
+const VERS_CATEGORIE_API = { Performance: "performance", Formation: "formation", "Développement personnel": "perso", "Présence": "performance" };
+const VERS_STATUT_API = { "En cours": "en_cours", Atteint: "atteint", "En retard": "abandonne" };
 
 // Mappe un objectif renvoyé par l'API vers la forme consommée par le JSX.
 // Les objectifs /api/me sont personnels (scopés au jeton) : pas de portée partagée
@@ -192,13 +197,33 @@ export default function Objectifs() {
   const liste = useMemo(() => (cat === "Tous" ? objectifs : objectifs.filter((o) => o.portee === cat)), [objectifs, cat]);
 
   const creationInvalide = !titre.trim() || (portee === "Partagé" && !fTous && fIds.length === 0);
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (creationInvalide) return;
     const estPartage = portee === "Partagé";
-    setObjectifs((prev) => [{ id: Date.now(), titre: titre.trim(), categorie, echeance, progression: 0, statut: "En cours", portee, tous: estPartage && fTous, membres: estPartage && !fTous ? [...new Set(fIds)] : [] }, ...prev]);
-    toast(`Objectif « ${titre.trim()} » créé`, "success");
+    const t = titre.trim();
+    // Carte optimiste (id temporaire) — la portée/les membres sont des notions locales (l'API ne les gère pas).
+    const tempId = `tmp-${Date.now()}`;
+    const local = { portee, tous: estPartage && fTous, membres: estPartage && !fTous ? [...new Set(fIds)] : [] };
+    const optimiste = { id: tempId, titre: t, categorie, echeance, progression: 0, statut: "En cours", ...local };
+    setObjectifs((prev) => [optimiste, ...prev]);
+    toast(`Objectif « ${t} » créé`, "success");
+    const formCat = categorie, formEch = echeance;
     setTitre(""); setCategorie(CATEGORIES[0]); setEcheance(""); setPortee("Personnel"); setFTous(true); setFIds([]);
+
+    try {
+      const cree = await apiPost("/api/me/objectifs", {
+        titre: t,
+        categorie: VERS_CATEGORIE_API[formCat] ?? "competences",
+        ...(formEch ? { echeance: formEch } : {}),
+        progression: 0,
+      });
+      // Remplace la carte optimiste par la réponse serveur, en conservant la portée/membres locaux.
+      setObjectifs((prev) => prev.map((o) => (o.id === tempId ? { ...mapObjectif(cree), ...local } : o)));
+    } catch (err) {
+      setObjectifs((prev) => prev.filter((o) => o.id !== tempId));
+      toast(err?.message || "Création impossible — réessayez.", "error");
+    }
   }
 
   const ouvrirGerer = (o) => {
@@ -207,15 +232,51 @@ export default function Objectifs() {
     setEProg(o.progression); setEStatut(o.statut);
   };
   const editInvalide = ePortee === "Partagé" && !eTous && eIds.length === 0;
-  const enregistrer = () => {
+  const enregistrer = async () => {
     if (editInvalide) return;
+    const cible = edit;
     const estP = ePortee === "Partagé";
-    setObjectifs((prev) => prev.map((o) => (o.id === edit.id ? { ...o, portee: ePortee, tous: estP && eTous, membres: estP && !eTous ? [...new Set(eIds)] : [], progression: eProg, statut: eStatut } : o)));
-    toast(`Objectif « ${edit.titre} » mis à jour`, "success");
+    const local = { portee: ePortee, tous: estP && eTous, membres: estP && !eTous ? [...new Set(eIds)] : [] };
+    const precedent = objectifs.find((o) => o.id === cible.id);
+    // Optimistic : applique progression/statut/portée immédiatement.
+    setObjectifs((prev) => prev.map((o) => (o.id === cible.id ? { ...o, ...local, progression: eProg, statut: eStatut } : o)));
+    toast(`Objectif « ${cible.titre} » mis à jour`, "success");
     setEdit(null);
+
+    // La portée/les membres sont locaux ; on ne persiste que progression + statut côté API.
+    // Les cartes optimistes pas encore confirmées (id temporaire) ne sont pas re-persistées.
+    if (typeof cible.id === "string" && cible.id.startsWith("tmp-")) return;
+    try {
+      const maj = await apiPut(`/api/me/objectifs/${cible.id}`, {
+        progression: eProg,
+        statut: VERS_STATUT_API[eStatut] ?? "en_cours",
+      });
+      setObjectifs((prev) => prev.map((o) => (o.id === cible.id ? { ...mapObjectif(maj), ...local } : o)));
+    } catch (err) {
+      if (precedent) setObjectifs((prev) => prev.map((o) => (o.id === cible.id ? precedent : o)));
+      toast(err?.message || "Mise à jour impossible — réessayez.", "error");
+    }
   };
   const supprimer = (o) => {
-    confirm?.({ title: "Supprimer cet objectif ?", message: `« ${o.titre} » sera définitivement retiré.`, confirmLabel: "Supprimer", danger: true, onConfirm: () => { setObjectifs((prev) => prev.filter((x) => x.id !== o.id)); toast("Objectif supprimé", "info"); } });
+    confirm?.({
+      title: "Supprimer cet objectif ?",
+      message: `« ${o.titre} » sera définitivement retiré.`,
+      confirmLabel: "Supprimer",
+      danger: true,
+      onConfirm: async () => {
+        const precedent = objectifs;
+        setObjectifs((prev) => prev.filter((x) => x.id !== o.id));
+        toast("Objectif supprimé", "info");
+        // Carte optimiste non confirmée : rien à supprimer côté API.
+        if (typeof o.id === "string" && o.id.startsWith("tmp-")) return;
+        try {
+          await apiDelete(`/api/me/objectifs/${o.id}`);
+        } catch (err) {
+          setObjectifs(precedent); // rollback
+          toast(err?.message || "Suppression impossible — réessayez.", "error");
+        }
+      },
+    });
   };
 
   const segPortee = (val, set) => (

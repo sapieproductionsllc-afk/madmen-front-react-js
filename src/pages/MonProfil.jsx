@@ -9,17 +9,31 @@ import Modal from "../components/ui/Modal.jsx";
 import { Input, Field } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { apiGet } from "../lib/api.js";
+import { apiGet, authMe } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/160?u=${encodeURIComponent(id)}`;
 
-const PERMISSIONS = ["Gestion du personnel", "Finance & paie", "Administration", "Rapports & analyses", "Appareils biométriques"];
-const CONNEXIONS = [
-  { id: 1, appareil: "Chrome · Windows", lieu: "Brazzaville, CG", date: "Aujourd'hui · 08:32", actuel: true },
-  { id: 2, appareil: "Safari · iPhone", lieu: "Brazzaville, CG", date: "Hier · 19:14" },
-  { id: 3, appareil: "Chrome · Windows", lieu: "Pointe-Noire, CG", date: "18 juin · 09:02" },
-];
+// Libellé d'affichage du rôle métier (valeurs réelles de l'API : employe,
+// superviseur, directeur, super_admin — cf. Core/Auth.php).
+const LIBELLE_ROLE = {
+  employe: "Employé",
+  superviseur: "Superviseur",
+  directeur: "Directeur",
+  super_admin: "Administrateur",
+};
+const libelleRole = (r) => LIBELLE_ROLE[r] || (r ? r.charAt(0).toUpperCase() + r.slice(1) : "Employé");
+
+// Permissions DÉRIVÉES du rôle (l'API ne renvoie pas de liste de permissions :
+// le RBAC est hiérarchique par rang). On affiche une liste neutre et cohérente
+// avec le rang réel de l'utilisateur — aucune donnée inventée.
+function permissionsDuRole(role) {
+  const base = ["Espace personnel", "Mes demandes", "Mes pointages"];
+  if (role === "superviseur") return [...base, "Suivi d'équipe", "Rapports & analyses"];
+  if (role === "directeur") return [...base, "Gestion du personnel", "Finance & paie", "Rapports & analyses"];
+  if (role === "super_admin") return ["Gestion du personnel", "Finance & paie", "Administration", "Rapports & analyses", "Appareils biométriques"];
+  return base; // employe
+}
 
 // Profil API (/api/me/profil) -> forme attendue par le JSX de la page.
 // On réutilise mapEmploye pour l'identité (name/email/role/matricule), puis on
@@ -32,10 +46,11 @@ function mapProfil(p) {
     name: e.name || "",
     email: e.email || "",
     telephone: p.telephone || e.phone || "", // l'API expose `telephone` en clair
-    role: e.role || p.role || "Administrateur",
+    role: e.role || p.role || "", // rôle BRUT (employe/superviseur/...) — libellé via libelleRole()
     fonction: p.poste || e.fonction || "—", // l'API expose `poste`
     department: p.departement || e.department || "—", // l'API expose `departement`
     manager: p.manager || "", // non utilisé par le design actuel — conservé au cas où
+    photo_url: p.photo_url || "", // photo réelle si présente
   };
 }
 
@@ -71,7 +86,7 @@ function Carte({ icon, titre, desc, children, action }) {
 }
 
 export default function MonProfil() {
-  const { user, login, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { toast, confirm } = useUI();
 
@@ -93,14 +108,47 @@ export default function MonProfil() {
   const [mdp, setMdp] = useState({ actuel: "", nouveau: "", confirme: "" });
 
   useEffect(() => {
+    let actif = true;
+    // Source principale : /api/me/profil (identité complète, scopée au jeton).
+    // DÉGRADATION GRACIEUSE : si elle échoue, on retombe sur /api/auth/me
+    // (matricule + rôle), puis sur le `user` en mémoire — sans planter la page.
     apiGet("/api/me/profil")
       .then((data) => {
+        if (!actif) return;
         const p = mapProfil(data || {});
         setProfil(p);
         setForm({ name: p.name, email: p.email, telephone: p.telephone });
       })
-      .catch((e) => setErreur(e.message || "Erreur de chargement"))
-      .finally(() => setChargement(false));
+      .catch(() =>
+        authMe()
+          .then((me) => {
+            if (!actif) return;
+            const p = mapProfil({
+              matricule: me?.matricule || user?.matricule || "",
+              role: me?.role || user?.role || "",
+              nom: user?.name || "",
+              email: user?.email || "",
+            });
+            setProfil(p);
+            setForm({ name: p.name, email: p.email, telephone: p.telephone });
+          })
+          .catch(() => {
+            if (!actif) return;
+            // Dernier recours : ce qu'on a en mémoire (contexte d'auth).
+            if (user) {
+              const p = mapProfil({ matricule: user.matricule, role: user.role, nom: user.name, email: user.email || "" });
+              setProfil(p);
+              setForm({ name: p.name, email: p.email, telephone: p.telephone });
+            } else {
+              setErreur("Profil indisponible pour le moment.");
+            }
+          })
+      )
+      .finally(() => actif && setChargement(false));
+    return () => {
+      actif = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const choisirPhoto = (e) => {
@@ -114,7 +162,8 @@ export default function MonProfil() {
   };
 
   const matricule = profil?.matricule || "—";
-  const role = profil?.role || "Administrateur";
+  const role = libelleRole(profil?.role);
+  const permissions = permissionsDuRole(profil?.role);
   const dirty = form.name !== base.name || form.email !== base.email || form.telephone !== base.telephone;
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -122,7 +171,8 @@ export default function MonProfil() {
     const email = form.email.trim();
     if (!form.name.trim() || !email) return toast("Nom et e-mail requis", "error");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast("Adresse e-mail invalide", "error");
-    login({ ...user, name: form.name.trim(), email, telephone: form.telephone.trim() });
+    // Pas d'endpoint d'écriture /api/me pour l'instant : on met à jour l'affichage
+    // localement (le rechargement de page repartira des données serveur).
     setProfil((p) => ({ ...p, name: form.name.trim(), email, telephone: form.telephone.trim() }));
     toast("Profil mis à jour", "success");
   };
@@ -157,7 +207,7 @@ export default function MonProfil() {
         <div className="relative shrink-0">
           <button type="button" onClick={() => fileRef.current?.click()} aria-label="Modifier la photo de profil" className="group rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-or-300 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-700">
             <span className="relative block rounded-full overflow-hidden ring-2 ring-or-400/80 ring-offset-2 ring-offset-brand-700">
-              <Avatar src={photo || photoDe(matricule)} name={form.name} size="w-16 h-16" textSize="text-xl" ring={false} />
+              <Avatar src={photo || profil?.photo_url || photoDe(matricule)} name={form.name} size="w-16 h-16" textSize="text-xl" ring={false} />
               <span className="absolute inset-0 bg-ink/45 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <Icon name="photo_camera" className="text-white text-[20px]" />
               </span>
@@ -203,21 +253,23 @@ export default function MonProfil() {
               <StatusPill label={role} tone="brand" dot={false} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Agence</span>
-              <span className="text-sm font-medium text-texte">Toutes les agences</span>
+              <span className="text-sm text-muted">Poste</span>
+              <span className="text-sm font-medium text-texte">{profil?.fonction || "—"}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Membre depuis</span>
-              <span className="text-sm font-medium text-texte">Janvier 2018</span>
+              <span className="text-sm text-muted">Département</span>
+              <span className="text-sm font-medium text-texte">{profil?.department || "—"}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Dernière connexion</span>
-              <span className="text-sm font-medium text-texte">Aujourd'hui · 08:32</span>
-            </div>
+            {profil?.manager && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted">Responsable</span>
+                <span className="text-sm font-medium text-texte">{profil.manager}</span>
+              </div>
+            )}
             <div className="pt-3 border-t border-border">
               <p className="text-xs text-subtle mb-2">Permissions</p>
               <div className="flex flex-wrap gap-1.5">
-                {PERMISSIONS.map((p) => (
+                {permissions.map((p) => (
                   <span key={p} className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-700 bg-brand-50 border border-brand-600/15 rounded-full px-2 py-1">
                     <Icon name="check" className="text-[13px]" /> {p}
                   </span>
@@ -254,20 +306,21 @@ export default function MonProfil() {
           </div>
         </Carte>
 
-        {/* Connexions récentes */}
+        {/* Connexions récentes — pas d'historique de connexions web exposé par l'API
+            (la route /api/sessions concerne les postes biométriques kiosque, hors
+            sujet ici). On affiche au moins la session courante, sans inventer. */}
         <Carte icon="devices" titre="Connexions récentes" desc="Activité récente de votre compte.">
           <div className="divide-y divide-border -my-1">
-            {CONNEXIONS.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 py-2.5">
-                <span className="w-9 h-9 rounded-xl bg-surface-2 text-muted flex items-center justify-center shrink-0"><Icon name="computer" className="text-[18px]" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-texte truncate">{c.appareil}</p>
-                  <p className="text-xs text-muted truncate">{c.lieu} · {c.date}</p>
-                </div>
-                {c.actuel && <span className="shrink-0"><StatusPill label="Session actuelle" tone="emerald" dot={false} /></span>}
+            <div className="flex items-center gap-3 py-2.5">
+              <span className="w-9 h-9 rounded-xl bg-surface-2 text-muted flex items-center justify-center shrink-0"><Icon name="computer" className="text-[18px]" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-texte truncate">Cet appareil</p>
+                <p className="text-xs text-muted truncate">Session en cours</p>
               </div>
-            ))}
+              <span className="shrink-0"><StatusPill label="Session actuelle" tone="emerald" dot={false} /></span>
+            </div>
           </div>
+          <p className="mt-3 text-xs text-subtle">L'historique détaillé des connexions n'est pas encore disponible.</p>
         </Carte>
       </div>
       </>
