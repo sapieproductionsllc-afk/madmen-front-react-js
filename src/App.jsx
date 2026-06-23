@@ -5,6 +5,7 @@ import Layout from "./components/layout/Layout.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Employes from "./pages/Employes.jsx";
+import Postes from "./pages/Postes.jsx";
 import ProfilEmploye from "./pages/ProfilEmploye.jsx";
 import ProfilDetails from "./pages/ProfilDetails.jsx";
 import Paiement from "./pages/Paiement.jsx";
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="employes/:id/paiement" element={<Paiement />} />
             <Route path="employes/:id/pointages" element={<Pointages />} />
             <Route path="enrolement" element={<Enrolement />} />
+            <Route path="postes" element={<Postes />} />
             <Route path="presence" element={<Presence />} />
             <Route path="activite" element={<Activite />} />
             <Route path="productivite" element={<Productivite />} />

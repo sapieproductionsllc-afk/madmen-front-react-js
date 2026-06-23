@@ -1,7 +1,7 @@
 // src/lib/api.js — Client API central (fetch + JWT). Branche le dashboard sur madmen-api-php.
 // Ne change PAS le design : il fournit juste les VRAIES données à la place des mocks.
 
-const BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const BASE = import.meta.env.VITE_API_URL || "https://api-madmen.ssmanager.uk";
 const TOKEN_KEY = "madmen_token";
 
 export const getToken = () => {

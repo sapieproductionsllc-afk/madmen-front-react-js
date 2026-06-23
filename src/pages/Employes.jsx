@@ -18,12 +18,19 @@ export default function Employes() {
   const [service, setService] = useState("Tous services");
   const [statut, setStatut] = useState("Tous statuts");
 
-  // Données RÉELLES depuis l'API (remplace les mocks de src/data).
+  // Données RÉELLES depuis l'API (remplace les mocks de src/data). Rechargé aussi
+  // après la création d'un agent (événement émis par AddEmployeeModal).
   useEffect(() => {
-    apiGet("/api/employes")
-      .then((data) => setEmployes((Array.isArray(data) ? data : []).map(mapEmploye)))
-      .catch((e) => setErreur(e.message || "Erreur de chargement"))
-      .finally(() => setChargement(false));
+    const charger = () => {
+      setChargement(true);
+      apiGet("/api/employes")
+        .then((data) => setEmployes((Array.isArray(data) ? data : []).map(mapEmploye)))
+        .catch((e) => setErreur(e.message || "Erreur de chargement"))
+        .finally(() => setChargement(false));
+    };
+    charger();
+    window.addEventListener("madmen:employe-cree", charger);
+    return () => window.removeEventListener("madmen:employe-cree", charger);
   }, []);
 
   const services = useMemo(
