@@ -133,6 +133,7 @@ export default function Enrolement() {
   const [photo, setPhoto] = useState(null); // aperçu (data URL) pour le badge
   const [photoFile, setPhotoFile] = useState(null); // fichier brut à téléverser
   const [captures, setCaptures] = useState(0);
+  const [template, setTemplate] = useState(null); // dernier gabarit capturé (réel, via l'agent)
   const [scanning, setScanning] = useState(false);
   const [atteste, setAtteste] = useState(false);
   const [done, setDone] = useState(false);
@@ -186,13 +187,22 @@ export default function Enrolement() {
     reader.readAsDataURL(file);
   };
 
-  const scanner = () => {
+  // Capture RÉELLE via l'agent d'empreintes local (Live20, http://127.0.0.1:8080).
+  // L'agent est lancé automatiquement par l'app desktop « MadMen Admin ».
+  const scanner = async () => {
     if (scanning || empreinteOk) return;
     setScanning(true);
-    setTimeout(() => {
-      setScanning(false);
+    try {
+      const r = await fetch("http://127.0.0.1:8080/capture", { method: "POST" });
+      if (!r.ok) throw new Error("capture");
+      const j = await r.json();
+      setTemplate(j.template || null);
       setCaptures((c) => Math.min(c + 1, 3));
-    }, 1200);
+    } catch {
+      toast("Lecteur d'empreintes indisponible — branchez le Live20 (app desktop requise)", "error");
+    } finally {
+      setScanning(false);
+    }
   };
 
   const etapeValide =
@@ -256,6 +266,7 @@ export default function Enrolement() {
     setPhoto(null);
     setPhotoFile(null);
     setCaptures(0);
+    setTemplate(null);
     setAtteste(false);
     setCree(null);
   };
@@ -472,7 +483,7 @@ export default function Enrolement() {
                     <span className="absolute inline-flex w-full h-full rounded-full bg-[#1E7D67]/40 animate-ping" />
                     <span className="relative inline-flex w-2 h-2 rounded-full bg-[#1E7D67]" />
                   </span>
-                  Lecteur connecté · ZK-9500
+                  Lecteur connecté · Live20
                 </div>
                 <button
                   onClick={scanner}

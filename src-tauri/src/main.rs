@@ -5,6 +5,7 @@
 
 mod commands;
 mod config;
+mod fingerprint;
 
 use tauri_plugin_autostart::ManagerExt;
 
@@ -14,9 +15,12 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             // Démarrage automatique avec Windows (enregistré au 1er lancement).
             let _ = app.handle().autolaunch().enable();
+            // Lance l'agent d'empreintes (sidecar) -> expose le Live20 sur :8080.
+            fingerprint::demarrer(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
