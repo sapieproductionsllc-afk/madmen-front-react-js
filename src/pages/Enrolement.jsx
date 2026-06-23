@@ -188,19 +188,33 @@ export default function Enrolement() {
   };
 
   // Capture RÉELLE via l'agent d'empreintes local (Live20, http://127.0.0.1:8080).
-  // L'agent est lancé automatiquement par l'app desktop « MadMen Admin ».
+  // L'agent BLOQUE jusqu'à ce qu'un doigt soit posé ; on ne compte le passage QUE si
+  // un vrai gabarit de qualité suffisante est lu. Délai max 25 s (sinon on annule).
   const scanner = async () => {
     if (scanning || empreinteOk) return;
     setScanning(true);
+    const ctrl = new AbortController();
+    const minuteur = setTimeout(() => ctrl.abort(), 25000);
     try {
-      const r = await fetch("http://127.0.0.1:8080/capture", { method: "POST" });
-      if (!r.ok) throw new Error("capture");
+      const r = await fetch("http://127.0.0.1:8080/capture", { method: "POST", body: "", signal: ctrl.signal });
+      if (!r.ok) throw new Error("http");
       const j = await r.json();
-      setTemplate(j.template || null);
+      // Garde-fou : pas de gabarit ou qualité nulle = pas de vrai doigt -> on ne compte pas.
+      if (!j.template || (typeof j.quality === "number" && j.quality <= 0)) {
+        toast("Doigt non détecté — repositionnez le doigt bien à plat et réessayez", "info");
+        return;
+      }
+      setTemplate(j.template);
       setCaptures((c) => Math.min(c + 1, 3));
-    } catch {
-      toast("Lecteur d'empreintes indisponible — branchez le Live20 (app desktop requise)", "error");
+    } catch (e) {
+      toast(
+        e?.name === "AbortError"
+          ? "Aucun doigt détecté (délai dépassé) — réessayez"
+          : "Lecteur d'empreintes indisponible — branchez le Live20 (app desktop requise)",
+        "error",
+      );
     } finally {
+      clearTimeout(minuteur);
       setScanning(false);
     }
   };
