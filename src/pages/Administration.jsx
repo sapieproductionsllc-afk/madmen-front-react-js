@@ -5,9 +5,11 @@ import Icon from "../components/ui/Icon.jsx";
 import Appareils from "./Appareils.jsx";
 import Utilisateurs from "./Utilisateurs.jsx";
 import Parametres from "./Parametres.jsx";
+import Identifiants from "./Identifiants.jsx";
 
 const SECTIONS = [
   { key: "appareils", label: "Appareils", icon: "sensors" },
+  { key: "identifiants", label: "Identifiants", icon: "key" },
   { key: "utilisateurs", label: "Utilisateurs", icon: "admin_panel_settings" },
   { key: "parametres", label: "Paramètres", icon: "settings" },
 ];
@@ -49,6 +51,7 @@ export default function Administration() {
 
       {/* Contenu */}
       {sec === "appareils" && <Appareils embedded />}
+      {sec === "identifiants" && <Identifiants embedded />}
       {sec === "utilisateurs" && <Utilisateurs embedded />}
       {sec === "parametres" && <Parametres embedded onDirty={setParamsDirty} />}
     </div>
