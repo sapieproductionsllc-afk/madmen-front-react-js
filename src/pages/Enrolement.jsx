@@ -292,16 +292,12 @@ export default function Enrolement() {
     }
   };
 
-  const etapeValide =
-    etape === 0
-      ? form.nom.trim() && form.fonction.trim()
-      : etape === 1
-        ? true // empreinte FACULTATIVE : on enregistre la personne maintenant, le doigt plus tard
-        : etape === 2
-          ? true // badge & PIN facultatifs (le PIN est généré automatiquement par le serveur)
-          : atteste;
+  // Navigation 100% LIBRE entre les étapes (aucun blocage gauche/droite).
+  // Le SEUL contrôle est à l'ENVOI : seul le NOM est obligatoire (+ attestation).
+  // Tout le reste peut être complété plus tard via « Modifier ».
+  const peutEnvoyer = form.nom.trim().length > 0 && atteste;
 
-  const suivant = () => etapeValide && setEtape((e) => Math.min(e + 1, 3));
+  const suivant = () => setEtape((e) => Math.min(e + 1, 3));
   const precedent = () => setEtape((e) => Math.max(e - 1, 0));
 
   // Création RÉELLE de l'employé. Sépare « nom complet » en prénom + nom, téléverse
@@ -795,6 +791,12 @@ export default function Enrolement() {
                   <input type="checkbox" checked={atteste} onChange={(e) => setAtteste(e.target.checked)} className="w-4 h-4 rounded accent-[#1E7D67]" />
                   J'atteste l'exactitude des informations saisies.
                 </label>
+                {!form.nom.trim() && (
+                  <p className="mt-3 flex items-center gap-1.5 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <Icon name="warning" filled className="text-[15px] shrink-0" aria-hidden="true" />
+                    Le nom est obligatoire pour enregistrer — renseignez-le à l'étape « Identité ».
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -812,8 +814,7 @@ export default function Enrolement() {
             {etape < 3 ? (
               <button
                 onClick={suivant}
-                disabled={!etapeValide}
-                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[9px] bg-[#1E7D67] text-white text-[13.5px] font-medium shadow-[0_6px_16px_-6px_rgba(30,125,103,0.5)] transition hover:bg-[#1C5C50] active:translate-y-px disabled:bg-[#A39E90] disabled:shadow-none disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[9px] bg-[#1E7D67] text-white text-[13.5px] font-medium shadow-[0_6px_16px_-6px_rgba(30,125,103,0.5)] transition hover:bg-[#1C5C50] active:translate-y-px"
               >
                 Continuer
                 <Icon name="arrow_forward" className="text-[16px]" aria-hidden="true" />
@@ -821,7 +822,7 @@ export default function Enrolement() {
             ) : (
               <button
                 onClick={terminer}
-                disabled={!atteste || enregistre}
+                disabled={!peutEnvoyer || enregistre}
                 className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[9px] bg-[#1E7D67] text-white text-[13.5px] font-medium shadow-[0_6px_16px_-6px_rgba(30,125,103,0.5)] transition hover:bg-[#1C5C50] active:translate-y-px disabled:bg-[#A39E90] disabled:shadow-none disabled:cursor-not-allowed"
               >
                 <Icon name={enregistre ? "progress_activity" : "check"} className={`text-[16px] ${enregistre ? "animate-spin" : ""}`} aria-hidden="true" />
