@@ -160,8 +160,8 @@ export default function SideNav({ open, onClose }) {
                 </span>
               </div>
               <div className="relative h-12 rounded-lg overflow-hidden bg-[#08160f] ecg-grid ring-1 ring-black/30">
-                <svg viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true" className={`absolute inset-y-0 h-full ${K40_CONNECTE ? "ecg-scroll" : ""}`} style={{ width: K40_CONNECTE ? "200%" : "100%", filter: `drop-shadow(0 0 2.5px ${K40_CONNECTE ? "rgba(52,211,153,.85)" : "rgba(240,113,106,.7)"})` }}>
-                  <path d={K40_CONNECTE ? ECG : "M0,20 H200"} fill="none" stroke={K40_CONNECTE ? "#34d399" : "#f0716a"} strokeWidth="1.7" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+                <svg viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true" className={`absolute inset-y-0 h-full ${connecte ? "ecg-scroll" : ""}`} style={{ width: connecte ? "200%" : "100%", filter: `drop-shadow(0 0 2.5px ${connecte ? "rgba(52,211,153,.85)" : "rgba(240,113,106,.7)"})` }}>
+                  <path d={connecte ? ECG : "M0,20 H200"} fill="none" stroke={connecte ? "#34d399" : "#f0716a"} strokeWidth="1.7" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
                 </svg>
                 <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-[#08160f] to-transparent" />
                 <div className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-gradient-to-l from-[#08160f] to-transparent" />
