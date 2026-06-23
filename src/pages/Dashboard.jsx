@@ -17,7 +17,7 @@ const ordreLive = { "En activité": 0, "En pause": 1, Absent: 2, Congé: 3 };
 
 // API statut (present/retard/absent/conge) -> statut live attendu par le JSX.
 // L'API n'expose pas de notion de « pause » : aucun agent ne tombera dans "En pause".
-const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé" };
+const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé", parti: "Parti" };
 
 // Construit l'employé (forme attendue par le JSX / CarteAgent) + son temps réel
 // à partir d'un agent renvoyé par /api/dashboard/presence (agents[]).
@@ -40,7 +40,7 @@ function mapAgentDashboard(a) {
   };
 }
 
-const statuts = ["Tous les statuts", "En activité", "En pause", "Absent", "Congé"];
+const statuts = ["Tous les statuts", "En activité", "En pause", "Parti", "Absent", "Congé"];
 
 const tonesPastille = {
   brand: "bg-brand-50 text-brand-600",

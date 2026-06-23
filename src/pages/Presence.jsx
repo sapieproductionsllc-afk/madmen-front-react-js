@@ -13,7 +13,7 @@ const ordreLive = { "En activité": 0, "En pause": 1, Absent: 2, Congé: 3 };
 
 // API statut (present/retard/absent/conge) -> statut live attendu par le JSX.
 // L'API n'expose pas de notion de « pause » : aucun agent ne tombera dans "En pause".
-const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé" };
+const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé", parti: "Parti" };
 
 // Construit l'objet attendu par les cartes/filtres à partir d'un agent de l'API.
 // On réutilise mapEmploye en remettant l'agent à la forme qu'il attend (`today`),

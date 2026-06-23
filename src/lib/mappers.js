@@ -3,7 +3,7 @@
 // Décisions actées : on garde `département` (pas d'`agence`) ; pas d'école (fonction = poste).
 
 const STATUT = { actif: "Actif", conge: "En congé", suspendu: "Suspendu" };
-const TODAY = { present: "Présent", retard: "Retard", absent: "Absent", conge: "Congé" };
+const TODAY = { present: "Présent", retard: "Retard", absent: "Absent", conge: "Congé", parti: "Parti" };
 
 /** Employé API -> objet attendu par les pages/cartes du dashboard. */
 export function mapEmploye(e) {

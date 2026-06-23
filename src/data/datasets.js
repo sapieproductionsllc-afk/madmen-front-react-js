@@ -9,10 +9,10 @@ export const agencesList = ["Siège Social", "Agence Centre", "Agence Nord", "Ag
 export const statutsEmploye = ["Actif", "Congé", "Suspendu"];
 
 // Statut « live » → tonalité de badge (vert / ambre / rouge / bleu).
-export const toneLive = { "En activité": "emerald", "En pause": "amber", "Absent": "rose", "Congé": "sky" };
+export const toneLive = { "En activité": "emerald", "En pause": "amber", "Parti": "slate", "Absent": "rose", "Congé": "sky" };
 
 // Ordre d'affichage des statuts « live ».
-export const ordreLive = { "En activité": 0, "En pause": 1, "Absent": 2, "Congé": 3 };
+export const ordreLive = { "En activité": 0, "En pause": 1, "Parti": 2, "Absent": 3, "Congé": 4 };
 
 // Devise officielle de l'app : FCFA. Format « 1 300 FCFA ».
 export const fcfa = (n) => Math.round(n).toLocaleString("fr-FR") + " FCFA";
