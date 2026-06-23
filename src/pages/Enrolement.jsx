@@ -59,7 +59,7 @@ function BadgeEmploye({ form, photo, empreinteOk, matricule, pin }) {
   return (
     <div className="bg-white rounded-[14px] border border-[#E6E1D4] overflow-hidden shadow-[0_8px_24px_-12px_rgba(22,70,61,0.22)]">
       {/* En-tête teal */}
-      <div className="relative bg-[#16463D] px-4 pt-3.5 pb-9 overflow-hidden">
+      <div className="relative bg-[#16463D] px-4 pt-3.5 pb-4 overflow-hidden">
         <Icon name="fingerprint" filled aria-hidden="true" className="pointer-events-none absolute -right-3 -bottom-6 text-white/[0.07] text-[90px] leading-none" />
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -73,10 +73,9 @@ function BadgeEmploye({ form, photo, empreinteOk, matricule, pin }) {
       </div>
 
       <div className="px-4 pb-4">
-        {/* Photo (chevauche l'en-tête) + identité.
-            `items-end` : seule la PHOTO remonte dans le teal ; le nom reste sous la ligne
-            de l'en-tête (sinon son haut était rogné par le fond teal sur les noms longs). */}
-        <div className="-mt-6 flex items-end gap-3">
+        {/* Identité — photo + nom ENTIÈREMENT dans la zone blanche (plus de chevauchement
+            sur l'en-tête teal, qui rognait le haut du nom). */}
+        <div className="mt-4 flex items-center gap-3">
           {photo ? (
             <img src={photo} alt="" className="w-16 h-16 rounded-xl object-cover ring-4 ring-white shrink-0" />
           ) : form.nom.trim() ? (
@@ -88,7 +87,7 @@ function BadgeEmploye({ form, photo, empreinteOk, matricule, pin }) {
               <Icon name="person" className="text-[#A39E90] text-[28px]" />
             </div>
           )}
-          <div className="min-w-0 pb-0.5">
+          <div className="min-w-0">
             <p className="text-[14px] font-medium text-[#2B2A27] truncate leading-tight">{form.nom.trim() || "Nouvel employé"}</p>
             <p className="text-[12px] text-[#6F6B60] truncate">{form.fonction.trim() || "Fonction à définir"}</p>
           </div>
