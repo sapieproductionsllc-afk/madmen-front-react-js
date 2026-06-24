@@ -65,7 +65,7 @@ const tranche = (p, tous) =>
 export default function Pointages() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { toast } = useUI();
+  const { toast, dataVersion } = useUI();
 
   const [e, setE] = useState(null);
   const [tous, setTous] = useState([]);
@@ -73,7 +73,7 @@ export default function Pointages() {
   const [erreur, setErreur] = useState(null);
 
   useEffect(() => {
-    setChargement(true);
+    if (!e) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
     setErreur(null);
     apiGet("/api/pointages")
       .then((data) => {
@@ -95,7 +95,7 @@ export default function Pointages() {
       })
       .catch((err) => setErreur(err.message || "Erreur de chargement"))
       .finally(() => setChargement(false));
-  }, [id]);
+  }, [id, dataVersion]);
 
   const annee = useMemo(() => {
     const parMois = {};

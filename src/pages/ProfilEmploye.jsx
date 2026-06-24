@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
 import BandeauAgent from "../components/ui/BandeauAgent.jsx";
 import CalendrierPresence from "../components/ui/CalendrierPresence.jsx";
+import PointageJourModal from "../components/pointage/PointageJourModal.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { apiGet } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
@@ -96,7 +97,7 @@ function construireCalendrier(paie) {
       }
     }
 
-    jours.push({ jour: d, dow, weekend, ferie, event, cours, futur, today: d === todayJour, etat, arrivee, depart, retardMin });
+    jours.push({ jour: d, date, dow, weekend, ferie, event, cours, futur, today: d === todayJour, etat, arrivee, depart, retardMin });
   }
 
   const heuresPlanifiees = (Number(paie?.temps_theorique_mensuel_sec) || 0) / 3600;
@@ -120,7 +121,7 @@ function construireCalendrier(paie) {
 export default function ProfilEmploye() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { toast } = useUI();
+  const { toast, dataVersion } = useUI();
 
   // Données RÉELLES depuis l'API (remplacent les mocks de src/data/datasets.js).
   const [e, setE] = useState(null);
@@ -128,10 +129,11 @@ export default function ProfilEmploye() {
   const [cal, setCal] = useState(null); // calendrier de présence reconstruit depuis la paie du mois
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const [jourEdit, setJourEdit] = useState(null); // jour du calendrier en édition (pointage manuel)
 
   useEffect(() => {
     let actif = true;
-    setChargement(true);
+    if (!e) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
     setErreur(null);
 
     // Employé (liste -> recherche par matricule, le param :id est le matricule)
@@ -167,7 +169,7 @@ export default function ProfilEmploye() {
     return () => {
       actif = false;
     };
-  }, [id]);
+  }, [id, dataVersion]);
 
   if (chargement) {
     return (
@@ -247,17 +249,10 @@ export default function ProfilEmploye() {
         plusIcon="chevron_right"
       />
 
-      {/* Calendrier de présence */}
-      <CalendrierPresence
-        cal={calAffiche}
-        onJour={(j) => {
-          const base = j.ferie ?? j.event ?? (j.etat === "Prévu" ? "à pointer" : j.etat) ?? "repos";
-          const horaires = j.arrivee
-            ? ` · arrivée ${j.arrivee}${j.depart ? ` → départ ${j.depart}` : " · pas encore reparti"}`
-            : "";
-          toast(`Journée du ${j.jour} ${calAffiche.mois.split(" ")[0].toLowerCase()} — ${base}${horaires}`, "info");
-        }}
-      />
+      {/* Calendrier de présence — clic sur un jour = saisir/corriger arrivée & départ */}
+      <CalendrierPresence cal={calAffiche} onJour={(j) => setJourEdit(j)} />
+
+      <PointageJourModal employeId={e._id} jour={jourEdit} onClose={() => setJourEdit(null)} />
 
       {/* Bande pointages → feuille de pointage éditable (admin) */}
       <button

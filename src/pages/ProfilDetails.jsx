@@ -5,6 +5,7 @@ import StatusPill from "../components/ui/StatusPill.jsx";
 import BandeauAgent from "../components/ui/BandeauAgent.jsx";
 import EditableField from "../components/ui/EditableField.jsx";
 import DocumentsSection from "../components/profil/DocumentsSection.jsx";
+import BadgeModal from "../components/badge/BadgeModal.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { apiGet, apiPut, apiPatch, apiUpload } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
@@ -184,7 +185,7 @@ export default function ProfilDetails() {
   const { id } = useParams(); // :id = matricule
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useUI();
+  const { toast, dataVersion } = useUI();
   const progress = useScrollProgress();
 
   const [e, setE] = useState(null); // employé « mappé » (BandeauAgent)
@@ -195,11 +196,12 @@ export default function ProfilDetails() {
   const [opts, setOpts] = useState({ postes: [], departements: [], superieurs: [] });
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const [badgeOuvert, setBadgeOuvert] = useState(false);
   const photoRef = useRef(null);
 
   useEffect(() => {
     let actif = true;
-    setChargement(true);
+    if (!e) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
     setErreur(null);
     setDetail(VIDE);
 
@@ -261,7 +263,7 @@ export default function ProfilDetails() {
       });
 
     return () => { actif = false; };
-  }, [id]);
+  }, [id, dataVersion]);
 
   // Défilement vers la section demandée.
   useEffect(() => {
@@ -355,21 +357,32 @@ export default function ProfilDetails() {
         <div className="h-full bg-or-500/80 transition-[width] duration-150" style={{ width: `${Math.round(progress * 100)}%` }} />
       </div>
 
-      {/* Bouton retour */}
-      <button
-        onClick={() => navigate(`/employes/${id}`)}
-        className="group inline-flex items-center gap-1.5 h-9 pl-2 pr-3.5 rounded-full bg-surface border border-border text-sm font-medium text-muted hover:text-ink hover:border-border-strong hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-      >
-        <Icon name="arrow_back" className="text-[18px] group-hover:-translate-x-0.5 transition-transform" />
-        Retour à la présence
-      </button>
+      {/* Barre : retour + badge */}
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={() => navigate(`/employes/${id}`)}
+          className="group inline-flex items-center gap-1.5 h-9 pl-2 pr-3.5 rounded-full bg-surface border border-border text-sm font-medium text-muted hover:text-ink hover:border-border-strong hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+        >
+          <Icon name="arrow_back" className="text-[18px] group-hover:-translate-x-0.5 transition-transform" />
+          Retour à la présence
+        </button>
+        <button
+          onClick={() => setBadgeOuvert(true)}
+          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+        >
+          <Icon name="badge" className="text-[18px]" />
+          Badge
+        </button>
+      </div>
+
+      <BadgeModal open={badgeOuvert} onClose={() => setBadgeOuvert(false)} employe={{ ...e, photo_url: emp?.photo_url }} />
 
       <BandeauAgent
         e={e}
         live={live}
         onPaiements={() => navigate(`/employes/${id}/paiement`)}
-        onPlus={() => navigate(`/employes/${id}`)}
-        plusLabel="Présence"
+        onPlus={() => navigate(`/pointage-horaires/${id}?solo=1`)}
+        plusLabel="Pointage & Horaires"
         plusIcon="event_available"
       />
 

@@ -7,6 +7,7 @@ import CarteAgent from "../components/ui/CarteAgent.jsx";
 import Avatar from "../components/ui/Avatar.jsx";
 import StatusPill from "../components/ui/StatusPill.jsx";
 import Table from "../components/ui/Table.jsx";
+import { useUI } from "../components/ui/UIProvider.jsx";
 import { apiGet } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
@@ -85,8 +86,9 @@ export default function Dashboard() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
 
+  const { dataVersion } = useUI(); // rafraîchit la vue après une synchro K40
   useEffect(() => {
-    setChargement(true);
+    if (!employes.length) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
     setErreur(null);
     // Présence (compteurs + agents[]) + productivité globale (KPI productivité).
     Promise.all([apiGet("/api/dashboard/presence"), apiGet("/api/productivite/global")])
@@ -95,7 +97,7 @@ export default function Dashboard() {
       })
       .catch((e) => setErreur(e?.message || "Erreur de chargement"))
       .finally(() => setChargement(false));
-  }, []);
+  }, [dataVersion]);
 
   // Index temps réel { matricule -> { live, detail, depuis } } (consommé par les cartes).
   const tempsReel = useMemo(() => Object.fromEntries(employes.map((e) => [e.id, e.tr])), [employes]);

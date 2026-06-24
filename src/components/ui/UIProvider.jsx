@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useCallback } from "react";
 import Modal from "./Modal.jsx";
 import Button from "./Button.jsx";
 import Icon from "./Icon.jsx";
-import AddEmployeeModal from "../modals/AddEmployeeModal.jsx";
 
 const UICtx = createContext(null);
 export const useUI = () => useContext(UICtx);
@@ -29,8 +28,11 @@ export function UIProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const [confirmState, setConfirmState] = useState(null);
   const [champValue, setChampValue] = useState("");
-  const [addOpen, setAddOpen] = useState(false);
   const [agence, setAgence] = useState("Toutes les agences");
+  // Signal global de rafraîchissement : bumpé après une synchro qui apporte du nouveau.
+  // Les vues incluent `dataVersion` dans leurs deps de fetch -> elles re-récupèrent sans reload.
+  const [dataVersion, setDataVersion] = useState(0);
+  const refreshData = useCallback(() => setDataVersion((v) => v + 1), []);
 
   const toast = useCallback((message, type = "success") => {
     const id = ++TOAST_ID;
@@ -42,12 +44,10 @@ export function UIProvider({ children }) {
     setChampValue(opts.input?.defaultValue ?? "");
     setConfirmState(opts);
   }, []);
-  const openAddEmployee = useCallback(() => setAddOpen(true), []);
-
   const fermerConfirm = () => setConfirmState(null);
 
   return (
-    <UICtx.Provider value={{ toast, confirm, openAddEmployee, agence, setAgence }}>
+    <UICtx.Provider value={{ toast, confirm, agence, setAgence, dataVersion, refreshData }}>
       {children}
 
       {/* Notifications */}
@@ -100,19 +100,6 @@ export function UIProvider({ children }) {
           </div>
         )}
       </Modal>
-
-      {/* Ajout d'employé (global) */}
-      <AddEmployeeModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onSaved={(nom) => {
-          // Ne PAS fermer ici : le modal affiche d'abord les identifiants générés
-          // (matricule + PIN), puis se ferme via « Terminé ». On notifie + on demande
-          // à la liste des agents de se rafraîchir.
-          toast(`Employé « ${nom} » créé`);
-          window.dispatchEvent(new CustomEvent("madmen:employe-cree"));
-        }}
-      />
     </UICtx.Provider>
   );
 }

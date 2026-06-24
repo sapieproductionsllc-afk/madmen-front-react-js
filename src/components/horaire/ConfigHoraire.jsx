@@ -23,6 +23,7 @@ const DEFAUT = {
   heure_depart: "17:00",
   jours: [1, 2, 3, 4, 5],
   tolerance_minutes: 10,
+  avance_minutes: 30,
 };
 
 // CSV ISO "1,2,3" -> [1,2,3] (filtre les valeurs hors 1..7).
@@ -43,6 +44,7 @@ function normaliser(h) {
   }
   const planning = h.planning && typeof h.planning === "object" ? h.planning : null;
   const tolerance = h.tolerance_minutes != null ? Number(h.tolerance_minutes) : DEFAUT.tolerance_minutes;
+  const avanceMin = h.avance_minutes != null ? Number(h.avance_minutes) : DEFAUT.avance_minutes;
 
   if (planning && Object.keys(planning).length > 0) {
     // Mode planning : un créneau par jour. On dérive aussi des valeurs « simples »
@@ -59,6 +61,7 @@ function normaliser(h) {
       heure_depart: toHHMM(premier.fin) || DEFAUT.heure_depart,
       jours,
       tolerance_minutes: tolerance,
+      avance_minutes: avanceMin,
       planning: planNorm,
       avance: true,
     };
@@ -69,6 +72,7 @@ function normaliser(h) {
     heure_depart: toHHMM(h.heure_depart) || DEFAUT.heure_depart,
     jours: h.jours_travailles != null ? parseJours(h.jours_travailles) : DEFAUT.jours,
     tolerance_minutes: tolerance,
+    avance_minutes: avanceMin,
     planning: {},
     avance: false,
   };
@@ -167,6 +171,7 @@ export default function ConfigHoraire({ employeId, onSaved }) {
     setErreur(null);
 
     const tolerance = Math.max(0, Number(form.tolerance_minutes) || 0);
+    const avanceMin = Math.min(240, Math.max(0, Number(form.avance_minutes) || 0));
     let payload;
     if (form.avance) {
       // Mode planning : un créneau par jour travaillé.
@@ -175,7 +180,7 @@ export default function ConfigHoraire({ employeId, onSaved }) {
         const c = form.planning[iso] || {};
         planning[String(iso)] = { debut: c.debut, fin: c.fin };
       }
-      payload = { planning, tolerance_minutes: tolerance };
+      payload = { planning, tolerance_minutes: tolerance, avance_minutes: avanceMin };
     } else {
       // Mode simple : mêmes heures pour tous les jours travaillés.
       payload = {
@@ -183,6 +188,7 @@ export default function ConfigHoraire({ employeId, onSaved }) {
         heure_depart: form.heure_depart,
         jours_travailles: [...form.jours].sort((a, b) => a - b).join(","),
         tolerance_minutes: tolerance,
+        avance_minutes: avanceMin,
       };
     }
 
@@ -299,7 +305,7 @@ export default function ConfigHoraire({ employeId, onSaved }) {
         </div>
       )}
 
-      {/* Tolérance de retard */}
+      {/* Tolérances : retard et arrivée en avance */}
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Tolérance de retard (minutes)">
           <div className="flex items-center gap-2">
@@ -313,13 +319,28 @@ export default function ConfigHoraire({ employeId, onSaved }) {
             />
             <span className="text-xs text-subtle whitespace-nowrap">min</span>
           </div>
-        </Field>
-        <div className="flex items-end">
-          <p className="text-[11px] text-faint flex items-center gap-1.5 pb-2.5">
+          <p className="mt-1.5 text-[11px] text-faint flex items-center gap-1.5">
             <Icon name="info" className="text-[14px]" />
             Arrivée au-delà de la tolérance = retard.
           </p>
-        </div>
+        </Field>
+        <Field label="Tolérance d'arrivée en avance (min)">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              max="240"
+              value={form.avance_minutes}
+              onChange={(e) => set({ avance_minutes: e.target.value })}
+              className="w-full rounded-lg bg-canvas border border-border px-3.5 py-2.5 text-sm text-texte outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 tabular-nums"
+            />
+            <span className="text-xs text-subtle whitespace-nowrap">min</span>
+          </div>
+          <p className="mt-1.5 text-[11px] text-faint flex items-center gap-1.5">
+            <Icon name="info" className="text-[14px]" />
+            Combien de temps avant son heure l'employé peut pointer (avant ça, le doigt est ignoré).
+          </p>
+        </Field>
       </div>
 
       {/* Validation + enregistrement */}

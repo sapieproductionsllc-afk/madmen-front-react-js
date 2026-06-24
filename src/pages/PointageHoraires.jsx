@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
 import Icon from "../components/ui/Icon.jsx";
@@ -125,8 +125,10 @@ function LigneEmploye({ e, actif, onClick }) {
 
 export default function PointageHoraires() {
   const { matricule } = useParams();
+  const [searchParams] = useSearchParams();
+  const solo = searchParams.get("solo") === "1"; // ouvert depuis la fiche d'un employé : vue mono-agent (sans liste)
   const navigate = useNavigate();
-  const { toast } = useUI();
+  const { toast, dataVersion } = useUI();
 
   const [employes, setEmployes] = useState([]);
   const [chargement, setChargement] = useState(true);
@@ -144,7 +146,7 @@ export default function PointageHoraires() {
   // Charge la liste des employés (résolution matricule -> id numérique).
   useEffect(() => {
     let actif = true;
-    setChargement(true);
+    if (!employes.length) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
     setErreur(null);
     apiGet("/api/employes")
       .then((data) => {
@@ -160,7 +162,7 @@ export default function PointageHoraires() {
     return () => {
       actif = false;
     };
-  }, [matricule]);
+  }, [matricule, dataVersion]);
 
   const selectionne = employes.find((e) => e.matricule === selId) || null;
   const empNumId = selectionne?._id ?? null;
@@ -172,7 +174,7 @@ export default function PointageHoraires() {
       return;
     }
     let actif = true;
-    setPaieChargement(true);
+    if (!paie) setPaieChargement(true); // calendrier : spinner au 1er chargement ; refresh = silencieux
     apiGet(`/api/employes/${empNumId}/paie?mois=${mois}`)
       .then((d) => actif && setPaie(d || null))
       .catch(() => actif && setPaie(null))
@@ -180,7 +182,7 @@ export default function PointageHoraires() {
     return () => {
       actif = false;
     };
-  }, [empNumId, mois, tick]);
+  }, [empNumId, mois, tick, dataVersion]);
 
   const liste = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -205,13 +207,23 @@ export default function PointageHoraires() {
 
   return (
     <div className="space-y-5 pb-12">
+      {solo && (
+        <button
+          onClick={() => navigate(`/employes/${matricule}/details`)}
+          className="group inline-flex items-center gap-1.5 h-9 pl-2 pr-3.5 rounded-full bg-surface border border-border text-sm font-medium text-muted hover:text-ink hover:border-border-strong hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+        >
+          <Icon name="arrow_back" className="text-[18px] group-hover:-translate-x-0.5 transition-transform" />
+          Retour à la fiche
+        </button>
+      )}
       <PageHeader
         title="Pointage & Horaires"
         subtitle="Configurez les horaires de chaque agent, suivez la présence et vérifiez le récap avant la paie."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
-        {/* Colonne gauche : liste des employés */}
+      <div className={`grid grid-cols-1 gap-5 items-start ${solo ? "" : "lg:grid-cols-[320px_1fr]"}`}>
+        {/* Colonne gauche : liste des employés (masquée en vue mono-agent depuis une fiche) */}
+        {!solo && (
         <div className="card p-3 lg:sticky lg:top-4">
           <div className="px-1 pb-3">
             <SearchInput value={q} onChange={setQ} placeholder="Rechercher un agent…" />
@@ -239,6 +251,7 @@ export default function PointageHoraires() {
             </div>
           )}
         </div>
+        )}
 
         {/* Colonne droite : config + calendrier + récap */}
         <div className="space-y-5">

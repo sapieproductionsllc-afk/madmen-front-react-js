@@ -16,7 +16,7 @@ const GUIDES = [
 ];
 
 const FAQ = [
-  { q: "Comment ajouter un employé ?", r: "Cliquez sur « + Actions » en haut à droite, puis « Ajouter un employé ». La photo et l'agence sont facultatives. L'employé pourra ensuite être enrôlé (empreinte, badge, code PIN) depuis la page Enrôlement." },
+  { q: "Comment ajouter un employé ?", r: "Cliquez sur « + Actions » → « Ajouter un employé » (ou le bouton « Ajouter un agent » sur la page Agents) : vous arrivez sur la page Enrôlement où vous saisissez les informations ET l'empreinte (le matricule et le code PIN sont générés automatiquement). C'est aussi depuis l'Enrôlement qu'on modifie un employé." },
   { q: "Comment payer tout le personnel d'un coup ?", r: "Dans Finance & Paie, ouvrez « Payer le personnel ». Cochez les agents souhaités ou utilisez « Tout payer » pour régler tout le monde en une seule fois. Une confirmation récapitule le montant total." },
   { q: "Comment fonctionnent les pointages ?", r: "Les appareils K40 (empreinte) et Watchman (reconnaissance faciale) remontent automatiquement les pointages. Sur la fiche d'un agent, « Gérer les pointages » permet de filtrer par jour, semaine, mois ou année et de corriger manuellement une entrée." },
   { q: "Comment approuver ou refuser une demande ?", r: "Dans Communication, onglet Demandes : chaque demande en attente dispose des boutons Approuver et Refuser. Vous pouvez filtrer par « À traiter », « Approuvées » ou « Refusées »." },

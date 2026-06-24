@@ -49,7 +49,7 @@ const cats = [
 ];
 
 export default function Presence() {
-  const { toast } = useUI();
+  const { toast, dataVersion } = useUI();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Tous");
   const [employes, setEmployes] = useState([]);
@@ -57,13 +57,13 @@ export default function Presence() {
   const [erreur, setErreur] = useState(null);
 
   useEffect(() => {
-    setChargement(true);
+    if (!employes.length) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
     setErreur(null);
     apiGet("/api/dashboard/presence")
       .then((data) => setEmployes((data?.agents ?? []).map(mapAgentPresence)))
       .catch((e) => setErreur(e?.message || "Erreur de chargement"))
       .finally(() => setChargement(false));
-  }, []);
+  }, [dataVersion]);
 
   const compte = (k) => employes.filter(cats.find((c) => c.key === k).test).length;
 

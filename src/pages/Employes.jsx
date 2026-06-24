@@ -5,12 +5,12 @@ import { FilterSelect } from "../components/ui/Input.jsx";
 import Button from "../components/ui/Button.jsx";
 import Icon from "../components/ui/Icon.jsx";
 import CarteAnnuaire from "../components/ui/CarteAnnuaire.jsx";
-import { useUI } from "../components/ui/UIProvider.jsx";
+import { useNavigate } from "react-router-dom";
 import { apiGet } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
 export default function Employes() {
-  const { openAddEmployee } = useUI();
+  const navigate = useNavigate();
   const [employes, setEmployes] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
@@ -18,8 +18,7 @@ export default function Employes() {
   const [service, setService] = useState("Tous services");
   const [statut, setStatut] = useState("Tous statuts");
 
-  // Données RÉELLES depuis l'API (remplace les mocks de src/data). Rechargé aussi
-  // après la création d'un agent (événement émis par AddEmployeeModal).
+  // Données RÉELLES depuis l'API. Rechargé au montage + sur l'événement « madmen:employe-cree ».
   useEffect(() => {
     const charger = () => {
       setChargement(true);
@@ -57,7 +56,7 @@ export default function Employes() {
   return (
     <div className="space-y-5 pb-12">
       <PageHeader title="Agents" subtitle="Annuaire du personnel — statut et affectation par agence.">
-        <Button icon="person_add" onClick={openAddEmployee}>
+        <Button icon="person_add" onClick={() => navigate("/enrolement")}>
           Ajouter un agent
         </Button>
       </PageHeader>
