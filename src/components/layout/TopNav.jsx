@@ -4,7 +4,7 @@ import Icon from "../ui/Icon.jsx";
 import Avatar from "../ui/Avatar.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { apiGet, apiPost } from "../../lib/api.js";
+import { apiGet } from "../../lib/api.js";
 import { mapEmploye } from "../../lib/mappers.js";
 import logo from "../../assets/logo.png";
 
@@ -70,7 +70,7 @@ function ItemMenu({ icon, label, onClick, to, state, danger }) {
 }
 
 export default function TopNav({ onMenuClick }) {
-  const { toast, refreshData, dataVersion } = useUI();
+  const { dataVersion } = useUI();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menu, setMenu] = useState(null); // "notif" | "profil" | "actions" | "agence"
@@ -81,13 +81,6 @@ export default function TopNav({ onMenuClick }) {
   // Données RÉELLES depuis l'API (remplacent les mocks de src/data) : cloche + recherche globale.
   const [alertes, setAlertes] = useState([]);
   const [employes, setEmployes] = useState([]);
-  const [sync, setSync] = useState(false);
-  const [autoSync, setAutoSync] = useState(true); // auto-synchro K40 toutes les 10 s
-  const [lastSync, setLastSync] = useState(null);
-  const [compteur, setCompteur] = useState(10); // décompte (s) avant la prochaine synchro
-  const [etatSync, setEtatSync] = useState(null); // 'ok' | 'echec' : résultat de la dernière synchro
-  const syncingRef = useRef(false); // garde anti-chevauchement (manuel + auto)
-  const tickRef = useRef(10);
 
   // Raccourci Ctrl/⌘ + K
   useEffect(() => {
@@ -132,63 +125,11 @@ export default function TopNav({ onMenuClick }) {
     : [];
   const aResultats = resEmployes.length > 0;
 
-  // Cœur de la synchro K40. silent=true => synchro de FOND (auto). Dans les DEUX cas on
-  // rafraîchit la VUE via refreshData() (bump dataVersion) au lieu de recharger la page :
-  // les nouvelles données apparaissent direct dans l'app, sans navigation ni reload.
-  // Renvoie true (succès) / false (échec) / null (ignoré : déjà en cours) — pilote la pastille.
-  const runSync = async ({ silent }) => {
-    if (syncingRef.current) return null; // déjà en cours -> ne change pas l'état
-    syncingRef.current = true;
-    if (!silent) {
-      setSync(true);
-      toast("Synchronisation en cours…", "info");
-    }
-    let ok = false;
-    try {
-      const r = await apiPost("/api/k40/sync", {});
-      setLastSync(new Date());
-      ok = true;
-      const nouveaux = Number(r?.traites ?? 0);
-      if (!silent) {
-        refreshData(); // rafraîchit les vues ouvertes, sans reload
-        toast(nouveaux > 0 ? `Synchronisé — ${nouveaux} pointage(s) à jour` : "Déjà à jour", "success");
-        setSync(false);
-      } else if (nouveaux > 0) {
-        refreshData(); // auto : on ne rafraîchit la vue QUE s'il y a du nouveau
-        toast(`${nouveaux} nouveau(x) pointage(s) synchronisé(s)`, "success");
-      }
-    } catch (e) {
-      ok = false;
-      // En auto : échec silencieux (le K40 bufferise, on réessaiera au prochain tick).
-      if (!silent) {
-        toast(e?.message || "Échec de la synchronisation (K40 joignable ?)", "error");
-        setSync(false);
-      }
-    }
-    syncingRef.current = false;
-    return ok;
-  };
-
-  // Décompte de 10 s : chaque seconde décrémente ; à 0 -> synchro K40 puis re-décompte.
-  // Le résultat (ok/échec) colore la pastille en vert/rouge. Verrou anti-chevauchement.
-  useEffect(() => {
-    if (!autoSync) return undefined;
-    tickRef.current = 10;
-    setCompteur(10);
-    const id = setInterval(() => {
-      const next = tickRef.current - 1;
-      if (next <= 0) {
-        tickRef.current = 10;
-        setCompteur(10);
-        runSync({ silent: true }).then((ok) => { if (ok != null) setEtatSync(ok ? "ok" : "echec"); });
-      } else {
-        tickRef.current = next;
-        setCompteur(next);
-      }
-    }, 1000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoSync]);
+  // NOUVELLE ARCHI : le dashboard ne pilote PLUS le K40. Les reporters (app MADMEN User
+  // sur chaque PC du bureau) lisent le K40 et poussent les pointages au cloud tout seuls.
+  // Le dashboard ne fait QUE LIRE : il se rafraîchit via dataVersion (polling auto dans
+  // UIProvider) et l'état du flux est montré par la bannière <BureauHorsLigne />.
+  // (Avant : un POST /api/k40/sync toutes les 10 s — route gateway-only, 404 sur le cloud.)
 
   const actions = [
     { label: "Payer les employés", icon: "payments", onClick: () => { fermer(); navigate("/finance"); } },
@@ -262,33 +203,8 @@ export default function TopNav({ onMenuClick }) {
         </div>
       </div>
 
-      {/* Droite : auto-synchro + notif + profil */}
+      {/* Droite : notif + profil */}
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
-        {/* Auto-synchro K40 : décompte 10 s, vert si la dernière a réussi / rouge si échec */}
-        <button
-          onClick={() => setAutoSync((a) => !a)}
-          aria-pressed={autoSync}
-          title={`Auto-synchro K40 ${autoSync ? "activée (toutes les 10 s)" : "désactivée — cliquer pour activer"}${lastSync ? ` · dernière : ${lastSync.toLocaleTimeString("fr-FR")}` : ""}`}
-          className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-xs font-medium transition-colors min-w-[82px] justify-center ${
-            !autoSync
-              ? "border-border-strong bg-surface text-muted hover:bg-surface-2"
-              : etatSync === "echec"
-              ? "border-rose-300 bg-rose-50 text-rose-600"
-              : etatSync === "ok"
-              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-              : "border-border-strong bg-surface text-muted"
-          }`}
-        >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              !autoSync ? "bg-slate-400" : etatSync === "echec" ? "bg-rose-500" : etatSync === "ok" ? "bg-emerald-500" : "bg-slate-400"
-            } ${autoSync && sync ? "animate-pulse" : ""}`}
-          />
-          <span className="tabular-nums whitespace-nowrap">
-            {!autoSync ? "Auto off" : sync ? "Sync…" : `Auto ${compteur}s`}
-          </span>
-        </button>
-
         {/* Actions rapides */}
         <div className="relative z-50">
           <button

@@ -76,13 +76,15 @@ function LienNav({ item, onNavigate }) {
 }
 
 export default function SideNav({ open, onClose }) {
-  // Statut réel de la pointeuse K40 : null = vérification, true/false = vrai état API.
+  // NOUVELLE ARCHI : le dashboard ne parle PAS directement au K40 (route /api/k40/status
+  // = gateway-only, 404 sur le cloud). On reflète l'état du FLUX via le relais : "Connecté"
+  // = des pointages remontent (bureau en ligne) ; "Hors ligne" = silence (quiet:true).
   const [k40Connecte, setK40Connecte] = useState(null);
   useEffect(() => {
     let actif = true;
     const verifier = () =>
-      apiGet("/api/k40/status")
-        .then((r) => actif && setK40Connecte(!!r?.connected))
+      apiGet("/api/relay/health")
+        .then((r) => actif && setK40Connecte(!r?.quiet))
         .catch(() => actif && setK40Connecte(false));
     verifier();
     const t = setInterval(verifier, 30000); // re-vérifie toutes les 30 s
