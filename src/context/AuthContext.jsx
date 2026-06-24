@@ -15,12 +15,29 @@ export function AuthProvider({ children }) {
     }
   });
 
-  // Au démarrage : si un jeton existe mais pas d'utilisateur en mémoire, on le valide.
+  // Au démarrage : on VALIDE le jeton (même si un utilisateur est déjà en mémoire).
+  // Si le jeton est invalide/expiré (ex. on a changé d'API local->cloud, ou il a
+  // expiré), on déconnecte PROPREMENT -> retour à l'écran de login, au lieu de rester
+  // coincé sur un dashboard qui fait des 401 en boucle (l'utilisateur en mémoire faisait
+  // croire qu'on était connecté alors que le jeton ne valait plus rien).
   useEffect(() => {
-    if (!user && getToken()) {
+    const finSession = () => {
+      clearToken();
+      setUser(null);
+      try {
+        sessionStorage.removeItem("madmen_user");
+        localStorage.removeItem("madmen_user");
+      } catch {
+        /* ignore */
+      }
+    };
+    const tok = getToken();
+    if (tok) {
       authMe()
         .then((me) => setUser((u) => u || { name: me.matricule, matricule: me.matricule, role: me.role }))
-        .catch(() => clearToken());
+        .catch(finSession);
+    } else if (user) {
+      finSession(); // utilisateur en mémoire mais aucun jeton -> session incohérente
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
