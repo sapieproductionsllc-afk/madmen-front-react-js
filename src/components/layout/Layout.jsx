@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import TopNav from "./TopNav.jsx";
 import SideNav from "./SideNav.jsx";
+import BureauHorsLigne from "./BureauHorsLigne.jsx";
 
 // Structure générale : barre du haut + menu latéral + contenu (Outlet).
 export default function Layout() {
@@ -12,6 +13,7 @@ export default function Layout() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-canvas text-texte">
+      <BureauHorsLigne />
       <TopNav onMenuClick={() => setMenuOuvert(true)} />
 
       <div className="flex flex-1 overflow-hidden">
