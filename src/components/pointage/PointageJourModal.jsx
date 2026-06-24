@@ -5,7 +5,7 @@ import Icon from "../ui/Icon.jsx";
 import TimePicker from "../ui/TimePicker.jsx";
 import { Field } from "../ui/Input.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
-import { apiPut } from "../../lib/api.js";
+import { apiPut, apiPost } from "../../lib/api.js";
 
 // "YYYY-MM-DD" -> "lundi 10 juin 2026".
 function labelDate(d) {
@@ -53,6 +53,30 @@ export default function PointageJourModal({ employeId, jour, onClose, onSaved })
     }
   };
 
+  // Pointage RAPIDE à l'heure ACTUELLE (cas : le K40 n'a pas pu lire l'empreinte ->
+  // l'employé va voir l'admin qui le pointe). Enregistre sur la date du jour ouvert +
+  // l'heure EXACTE du clic (heure locale du bureau), via POST .../pointage-manuel.
+  const pointerMaintenant = async (type) => {
+    if (!employeId || !jour?.date) return;
+    setSaving(true);
+    try {
+      const n = new Date();
+      const p2 = (x) => String(x).padStart(2, "0");
+      const horodatage = `${jour.date} ${p2(n.getHours())}:${p2(n.getMinutes())}:${p2(n.getSeconds())}`;
+      const r = await apiPost(`/api/employes/${employeId}/pointage-manuel`, { horodatage, type });
+      const hhmm = (dt) => (dt ? String(dt).slice(11, 16) : "");
+      setArrivee(hhmm(r?.pointage?.heure_entree));
+      setDepart(hhmm(r?.pointage?.heure_sortie));
+      toast(type === "entree" ? `Arrivée pointée à ${p2(n.getHours())}:${p2(n.getMinutes())}` : `Sortie pointée à ${p2(n.getHours())}:${p2(n.getMinutes())}`, "success");
+      refreshData();
+      onSaved?.();
+    } catch (e) {
+      toast(e?.message || "Échec du pointage manuel", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Modal
       open={!!jour}
@@ -71,7 +95,20 @@ export default function PointageJourModal({ employeId, jour, onClose, onSaved })
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-muted">Renseignez ou corrigez l'heure d'arrivée et de départ pour ce jour.</p>
+        {/* Pointage RAPIDE à l'heure actuelle — secours quand le K40 n'a pas lu l'empreinte. */}
+        <div className="rounded-xl border border-border bg-surface-2 p-3 space-y-2">
+          <p className="text-xs font-semibold text-texte">Pointer à l'heure actuelle</p>
+          <p className="text-[11px] text-subtle -mt-1">Empreinte non lue ? Enregistre à la seconde près, sur ce jour.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="secondary" icon="login" onClick={() => pointerMaintenant("entree")} disabled={saving}>
+              Pointer l'arrivée
+            </Button>
+            <Button variant="secondary" icon="logout" onClick={() => pointerMaintenant("sortie")} disabled={saving}>
+              Pointer la sortie
+            </Button>
+          </div>
+        </div>
+        <p className="text-sm text-muted">Ou corrigez manuellement l'heure d'arrivée et de départ :</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Heure d'arrivée"><TimePicker value={arrivee} onChange={setArrivee} /></Field>
           <Field label="Heure de départ"><TimePicker value={depart} onChange={setDepart} /></Field>
