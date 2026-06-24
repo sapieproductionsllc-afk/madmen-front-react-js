@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import Modal from "./Modal.jsx";
 import Button from "./Button.jsx";
 import Icon from "./Icon.jsx";
@@ -33,6 +33,20 @@ export function UIProvider({ children }) {
   // Les vues incluent `dataVersion` dans leurs deps de fetch -> elles re-récupèrent sans reload.
   const [dataVersion, setDataVersion] = useState(0);
   const refreshData = useCallback(() => setDataVersion((v) => v + 1), []);
+
+  // Auto-rafraîchissement : on bumpe dataVersion toutes les 30 s ET au retour sur l'onglet
+  // -> toutes les vues qui dépendent de dataVersion (dashboard/présence…) re-récupèrent les
+  // données fraîches de l'API SANS reload manuel. Refresh SILENCIEUX (le spinner ne s'affiche
+  // qu'au 1er chargement). C'est ce qui fait apparaître p.ex. une arrivée fraîche toute seule.
+  useEffect(() => {
+    const id = setInterval(refreshData, 30000);
+    const onFocus = () => refreshData(); // immédiat quand on revient sur l'onglet
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refreshData]);
 
   const toast = useCallback((message, type = "success") => {
     const id = ++TOAST_ID;
