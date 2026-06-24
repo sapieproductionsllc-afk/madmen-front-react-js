@@ -24,7 +24,7 @@ const etapes = [
 ];
 
 const aide = {
-  0: "Renseignez le nom complet et la fonction. Le matricule MADMEN est généré automatiquement.",
+  0: "Renseignez le prénom, le nom et la fonction. Le matricule MADMEN est généré automatiquement.",
   1: "Nettoyez le capteur, posez le doigt à plat et maintenez ~2 s. Trois passages améliorent la fiabilité.",
   2: "Associez le badge RFID physique remis à l'employé et définissez un code PIN à 4 chiffres.",
   3: "Vérifiez le récapitulatif. Une fois confirmé, l'employé pourra pointer immédiatement.",
@@ -98,9 +98,9 @@ function BadgeEmploye({ form, photo, empreinteOk, matricule, pin }) {
         <div className="mt-4 flex items-center gap-3">
           {photo ? (
             <img src={photo} alt="" className="w-16 h-16 rounded-xl object-cover ring-4 ring-white shrink-0" />
-          ) : form.nom.trim() ? (
+          ) : `${form.prenom} ${form.nom}`.trim() ? (
             <div className="w-16 h-16 rounded-xl ring-4 ring-white bg-[#E7F0EC] text-[#1C5C50] flex items-center justify-center text-lg font-medium shrink-0">
-              {initialesDe(form.nom)}
+              {initialesDe(`${form.prenom} ${form.nom}`)}
             </div>
           ) : (
             <div className="w-16 h-16 rounded-xl ring-4 ring-white bg-[#FBF9F4] border border-[#E6E1D4] flex items-center justify-center shrink-0">
@@ -108,7 +108,7 @@ function BadgeEmploye({ form, photo, empreinteOk, matricule, pin }) {
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-[14px] font-medium text-[#2B2A27] truncate leading-tight">{form.nom.trim() || "Nouvel employé"}</p>
+            <p className="text-[14px] font-medium text-[#2B2A27] truncate leading-tight">{`${form.prenom} ${form.nom}`.trim() || "Nouvel employé"}</p>
             <p className="text-[12px] text-[#6F6B60] truncate">{form.fonction.trim() || "Fonction à définir"}</p>
           </div>
         </div>
@@ -150,7 +150,7 @@ export default function Enrolement() {
   const editMode = Boolean(editId);
   const [etape, setEtape] = useState(0);
   const [form, setForm] = useState({
-    nom: "", fonction: "", departement: "", email: "", badge: "", pin: "",
+    prenom: "", nom: "", fonction: "", departement: "", email: "", badge: "", pin: "",
     sexe: "", date_naissance: "", nationalite: "", etat_civil: "",
     telephone: "", adresse: "",
     contact_urgence_nom: "", contact_urgence_tel: "", contact_urgence_lien: "",
@@ -216,7 +216,8 @@ export default function Enrolement() {
         if (!actif || !e) return;
         setForm((f) => ({
           ...f,
-          nom: e.name || `${e.prenom ?? ""} ${e.nom ?? ""}`.trim(),
+          prenom: e.prenom || "",
+          nom: e.nom || "",
           fonction: e.poste_libelle || "",
           departement: e.departement_nom || "",
           email: e.email || "",
@@ -249,7 +250,7 @@ export default function Enrolement() {
   const pct = Math.round(((etape + 1) / 4) * 100);
   const pinValide = /^\d{4}$/.test(form.pin);
   // Matricule affiché : le VRAI renvoyé par l'API une fois créé, sinon un placeholder.
-  const matricule = cree?.matricule || (form.nom.trim() ? "AUR-…" : "AUR-————");
+  const matricule = cree?.matricule || (`${form.prenom} ${form.nom}`.trim() ? "AUR-…" : "AUR-————");
 
   const onPhoto = (e) => {
     const file = e.target.files?.[0];
@@ -295,7 +296,7 @@ export default function Enrolement() {
   // Navigation 100% LIBRE entre les étapes (aucun blocage gauche/droite).
   // Le SEUL contrôle est à l'ENVOI : seul le NOM est obligatoire (+ attestation).
   // Tout le reste peut être complété plus tard via « Modifier ».
-  const peutEnvoyer = form.nom.trim().length > 0 && atteste;
+  const peutEnvoyer = form.prenom.trim().length > 0 && form.nom.trim().length > 0 && atteste;
 
   const suivant = () => setEtape((e) => Math.min(e + 1, 3));
   const precedent = () => setEtape((e) => Math.max(e - 1, 0));
@@ -307,10 +308,9 @@ export default function Enrolement() {
     if (!atteste || enregistre) return;
     setEnregistre(true);
 
-    // « Jean Dupont » -> prenom: "Jean", nom: "Dupont" (dernier mot = nom de famille).
-    const morceaux = form.nom.trim().split(/\s+/).filter(Boolean);
-    const nom = morceaux.length > 1 ? morceaux.pop() : (morceaux[0] || "");
-    const prenom = morceaux.join(" ") || nom;
+    // Prénom + nom saisis SÉPARÉMENT (plus de découpage hasardeux d'un « nom complet »).
+    const prenom = form.prenom.trim();
+    const nom = form.nom.trim();
 
     try {
       // Téléversement optionnel de la photo (best-effort : un échec n'empêche pas
@@ -366,7 +366,7 @@ export default function Enrolement() {
       }
 
       setDone(true);
-      toast(`${form.nom.trim()} a été ${editMode ? "modifié" : "enrôlé"} avec succès`);
+      toast(`${prenom} ${nom} a été ${editMode ? "modifié" : "enrôlé"} avec succès`);
     } catch (err) {
       toast(err?.message || "Échec de la création de l'employé", "error");
     } finally {
@@ -378,7 +378,7 @@ export default function Enrolement() {
     setDone(false);
     setEtape(0);
     setForm({
-      nom: "", fonction: "", departement: "", email: "", badge: "", pin: "",
+      prenom: "", nom: "", fonction: "", departement: "", email: "", badge: "", pin: "",
       sexe: "", date_naissance: "", nationalite: "", etat_civil: "",
       telephone: "", adresse: "",
       contact_urgence_nom: "", contact_urgence_tel: "", contact_urgence_lien: "",
@@ -419,7 +419,7 @@ export default function Enrolement() {
               {PuceOr}
               <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#E7C173]">Enrôlement terminé</span>
             </div>
-            <h2 className="text-[24px] font-medium text-white tracking-tight">{form.nom} est {editMode ? "modifié" : "enrôlé"}</h2>
+            <h2 className="text-[24px] font-medium text-white tracking-tight">{`${form.prenom} ${form.nom}`.trim()} est {editMode ? "modifié" : "enrôlé"}</h2>
             <p className="text-[13px] text-white/[0.68] mt-1.5">
               Matricule <span className="font-mono text-white">{matricule}</span> · l'employé peut désormais pointer.
             </p>
@@ -772,7 +772,7 @@ export default function Enrolement() {
                 </div>
                 <div className="rounded-[12px] border border-[#E6E1D4] divide-y divide-[#E6E1D4] overflow-hidden">
                   {[
-                    ["Nom et prénom", form.nom, false, false],
+                    ["Prénom et nom", `${form.prenom} ${form.nom}`.trim(), false, false],
                     ["Téléphone", form.telephone, false, false],
                     ["Fonction", form.fonction, false, false],
                     ["Département", form.departement, false, false],
@@ -791,10 +791,10 @@ export default function Enrolement() {
                   <input type="checkbox" checked={atteste} onChange={(e) => setAtteste(e.target.checked)} className="w-4 h-4 rounded accent-[#1E7D67]" />
                   J'atteste l'exactitude des informations saisies.
                 </label>
-                {!form.nom.trim() && (
+                {(!form.prenom.trim() || !form.nom.trim()) && (
                   <p className="mt-3 flex items-center gap-1.5 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                     <Icon name="warning" filled className="text-[15px] shrink-0" aria-hidden="true" />
-                    Le nom est obligatoire pour enregistrer — renseignez-le à l'étape « Identité ».
+                    Le prénom et le nom sont obligatoires — renseignez-les à l'étape « Identité ».
                   </p>
                 )}
               </div>
