@@ -73,7 +73,7 @@ export default function TopNav({ onMenuClick }) {
   const { dataVersion } = useUI();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [menu, setMenu] = useState(null); // "notif" | "profil" | "actions" | "agence"
+  const [menu, setMenu] = useState(null); // "notif" | "profil"
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef(null);
@@ -130,11 +130,6 @@ export default function TopNav({ onMenuClick }) {
   // Le dashboard ne fait QUE LIRE : il se rafraîchit via dataVersion (polling auto dans
   // UIProvider) et l'état du flux est montré par la bannière <BureauHorsLigne />.
   // (Avant : un POST /api/k40/sync toutes les 10 s — route gateway-only, 404 sur le cloud.)
-
-  const actions = [
-    { label: "Payer les employés", icon: "payments", onClick: () => { fermer(); navigate("/finance"); } },
-    { label: "Ajouter un employé", icon: "fingerprint", onClick: () => { fermer(); navigate("/enrolement"); } },
-  ];
 
   const anyOpen = menu || (searchOpen && q);
 
@@ -205,27 +200,6 @@ export default function TopNav({ onMenuClick }) {
 
       {/* Droite : notif + profil */}
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
-        {/* Actions rapides */}
-        <div className="relative z-50">
-          <button
-            onClick={() => basculer("actions")}
-            className="bg-brand-600 text-canvas px-3.5 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 active:translate-y-px transition-colors flex items-center gap-1.5 shadow-soft"
-            aria-haspopup="menu"
-            aria-expanded={menu === "actions"}
-          >
-            <Icon name="add" className="text-[18px]" />
-            <span className="hidden sm:inline">Actions</span>
-            <Icon name="expand_more" className={`text-[18px] -ml-0.5 transition-transform duration-150 ${menu === "actions" ? "rotate-180" : ""}`} />
-          </button>
-          {menu === "actions" && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-2xl shadow-pop p-1.5 modal-in">
-              {actions.map((a) => (
-                <ItemMenu key={a.label} icon={a.icon} label={a.label} onClick={a.onClick} />
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Notifications (accessible aussi sur mobile : badge non-lues critique) */}
         <div className="relative block z-50">
           <button
