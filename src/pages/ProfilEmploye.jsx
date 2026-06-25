@@ -221,21 +221,14 @@ export default function ProfilEmploye() {
 
   return (
     <div className="space-y-4 pb-10">
-      {/* Barre : retour + modifier */}
-      <div className="flex items-center justify-between gap-2">
+      {/* Barre : retour (la modification se fait via « Détails & modification ») */}
+      <div className="flex items-center gap-2">
         <button
           onClick={() => navigate(-1)}
           className="group inline-flex items-center gap-1.5 h-9 pl-2 pr-3.5 rounded-full bg-surface border border-border text-sm font-medium text-muted hover:text-ink hover:border-border-strong hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
         >
           <Icon name="arrow_back" className="text-[18px] group-hover:-translate-x-0.5 transition-transform" />
           Retour
-        </button>
-        <button
-          onClick={() => navigate(`/enrolement/${e._id}`)}
-          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-        >
-          <Icon name="edit" className="text-[18px]" />
-          Modifier
         </button>
       </div>
 
@@ -245,8 +238,8 @@ export default function ProfilEmploye() {
         tauxHoraire={calAffiche.tauxHoraire}
         onPaiements={() => navigate(`/employes/${id}/paiement`)}
         onPlus={() => navigate(`/employes/${id}/details`)}
-        plusLabel="Plus de détails"
-        plusIcon="chevron_right"
+        plusLabel="Détails & modification"
+        plusIcon="edit_note"
       />
 
       {/* Calendrier de présence — clic sur un jour = saisir/corriger arrivée & départ */}

@@ -1,10 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Avatar from "./Avatar.jsx";
 import Icon from "./Icon.jsx";
-import Modal from "./Modal.jsx";
-import Button from "./Button.jsx";
-import { Input, Field } from "./Input.jsx";
-import { useUI } from "./UIProvider.jsx";
+import MenuBurgerProfil from "./MenuBurgerProfil.jsx";
 import { fcfa } from "../../data/datasets.js";
 import { apiGet } from "../../lib/api.js";
 
@@ -30,11 +27,11 @@ const dotLive = { "En activité": "bg-emerald-400", "En pause": "bg-amber-400", 
 const focusOr = "focus:outline-none focus-visible:ring-2 focus-visible:ring-or-400 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-700";
 
 // Bandeau profil agent (vert sapin) — partagé entre la fiche Présence et la page Détails.
+// Actions : Paiements · bouton fusionné détails/modification (onPlus) · menu burger (actions admin).
 export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, onPaiements, onPlus, plusLabel = "Plus de détails", plusIcon = "chevron_right" }) {
-  const { toast } = useUI();
   const [showSalaire, setShowSalaire] = useState(true);
 
-  // Infos affichées (modifiables par l'admin via la modale).
+  // Infos affichées (nom / fonction / contact / salaire net du bulletin).
   const [info, setInfo] = useState({
     name: e.name || `${e.prenom ?? ""} ${e.nom ?? ""}`.trim(),
     prenom: e.prenom ?? "",
@@ -68,29 +65,6 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
     };
   }, [e._id, e.id]);
 
-  const [editOuvert, setEditOuvert] = useState(false);
-  const [form, setForm] = useState(info);
-  const fileRef = useRef(null);
-  const maj = (k) => (ev) => setForm((f) => ({ ...f, [k]: ev.target.value }));
-
-  const ouvrirEdit = () => { setForm(info); setEditOuvert(true); };
-  const choisirPhoto = (ev) => {
-    const f = ev.target.files?.[0];
-    if (f) setForm((fm) => ({ ...fm, photo: URL.createObjectURL(f) }));
-    ev.target.value = "";
-  };
-  const enregistrer = () => {
-    const email = form.email.trim();
-    const prenom = form.prenom.trim();
-    const nom = form.nom.trim();
-    if (!prenom || !nom || !email) return toast("Prénom, nom et e-mail requis", "error");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast("Adresse e-mail invalide", "error");
-    const name = `${prenom} ${nom}`.trim();
-    setInfo({ ...form, prenom, nom, name, email, salaire: Number(form.salaire) || 0 });
-    setEditOuvert(false);
-    toast(`Informations de ${name} mises à jour`, "success");
-  };
-
   const showDept = info.department && !info.fonction.toLowerCase().includes(info.department.toLowerCase());
 
   return (
@@ -116,7 +90,7 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
             {info.fonction}{showDept && <> · {info.department}</>} · <span className="font-mono">{e.id}</span>
           </p>
 
-          {/* Contact + paramètres + rémunération */}
+          {/* Contact + rémunération */}
           <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-2 text-sm">
             <span className="inline-flex items-center gap-1.5 text-white/85 min-w-0">
               <Icon name="mail" className="text-[16px] text-white/70 shrink-0" />
@@ -147,57 +121,19 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions : Paiements + bouton fusionné (détails/modification) + menu burger */}
         <div className="flex items-center justify-center gap-2 shrink-0">
           <button onClick={onPaiements} className={`inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-or-500 text-white hover:bg-or-400 transition-colors ${focusOr}`}>
             <Icon name="payments" className="text-[18px]" filled /> Paiements
           </button>
-          <button onClick={() => toast(`Message à ${info.name}`, "info")} aria-label="Message" title="Message" className={`w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-colors ${focusOr}`}>
-            <Icon name="mail" className="text-[18px]" />
-          </button>
-          <button onClick={onPlus} className={`inline-flex items-center gap-1 h-10 px-3.5 rounded-xl text-sm font-medium bg-white/5 hover:bg-white/15 text-white/90 border border-white/15 transition-colors ${focusOr}`}>
-            {plusLabel} <Icon name={plusIcon} className="text-[18px]" />
-          </button>
-          <button onClick={ouvrirEdit} aria-label="Modifier les informations de l'agent" title="Paramètres de l'agent" className={`w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-colors ${focusOr}`}>
-            <Icon name="settings" className="text-[18px]" />
-          </button>
+          {onPlus && (
+            <button onClick={onPlus} className={`inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-white/15 hover:bg-white/25 text-white border border-white/20 transition-colors ${focusOr}`}>
+              <Icon name={plusIcon} className="text-[18px]" /> {plusLabel}
+            </button>
+          )}
+          <MenuBurgerProfil e={e} />
         </div>
       </div>
-
-      {/* Modale d'édition de l'agent */}
-      <Modal
-        open={editOuvert}
-        onClose={() => setEditOuvert(false)}
-        title="Modifier l'agent"
-        subtitle={`Informations de ${info.name} · ${e.id}`}
-        icon="manage_accounts"
-        footer={<><Button variant="ghost" onClick={() => setEditOuvert(false)}>Annuler</Button><Button variant="primary" icon="save" onClick={enregistrer}>Enregistrer</Button></>}
-      >
-        {/* Photo de l'agent */}
-        <div className="flex items-center gap-4 mb-4">
-          <span className="w-16 h-16 rounded-full bg-surface-2 border border-border overflow-hidden flex items-center justify-center shrink-0">
-            <img src={form.photo || photoDe(e.id)} alt="Photo de l'agent" className="w-full h-full object-cover" />
-          </span>
-          <div className="min-w-0">
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={choisirPhoto} />
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" size="sm" icon="photo_camera" onClick={() => fileRef.current?.click()}>Changer la photo</Button>
-              {form.photo && <Button variant="ghost" size="sm" icon="restart_alt" onClick={() => setForm((f) => ({ ...f, photo: null }))}>Réinitialiser</Button>}
-            </div>
-            <p className="text-xs text-subtle mt-1.5">JPG, PNG ou WebP.</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Prénom *"><Input value={form.prenom} onChange={maj("prenom")} placeholder="Ex. Jean" /></Field>
-          <Field label="Nom *"><Input value={form.nom} onChange={maj("nom")} placeholder="Ex. Dupont" /></Field>
-          <Field label="Fonction"><Input value={form.fonction} onChange={maj("fonction")} placeholder="Ex. Comptable" /></Field>
-          <Field label="Service / agence"><Input value={form.department} onChange={maj("department")} placeholder="Ex. Siège social" /></Field>
-          <Field label="Adresse e-mail *" className="sm:col-span-2"><Input type="email" value={form.email} onChange={maj("email")} placeholder="prenom.nom@madmen.io" /></Field>
-          <Field label="Téléphone"><Input value={form.phone} onChange={maj("phone")} placeholder="+242 06 00 00 00" /></Field>
-          <Field label="Salaire net (FCFA)"><Input type="number" min="0" value={form.salaire} onChange={maj("salaire")} /></Field>
-        </div>
-      </Modal>
     </div>
   );
 }
