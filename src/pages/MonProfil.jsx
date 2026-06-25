@@ -179,8 +179,10 @@ export default function MonProfil() {
   const fermerMdp = () => { setMdpOuvert(false); setMdp({ actuel: "", nouveau: "", confirme: "" }); };
   const validerMdp = () => {
     if (!mdp.nouveau || mdp.nouveau !== mdp.confirme) return toast("Les mots de passe ne correspondent pas", "error");
+    // SÉCURITÉ : pas d'endpoint de changement de PIN self-service -> NE PAS prétendre que
+    // c'est fait. On oriente vers la régénération de PIN par un administrateur.
     fermerMdp();
-    toast("Mot de passe modifié", "success");
+    toast("Changement non disponible ici — demandez à un administrateur de régénérer votre PIN.", "info");
   };
   const deconnexion = () =>
     confirm({ title: "Se déconnecter ?", message: "Vous serez redirigé vers la page de connexion.", confirmLabel: "Se déconnecter", danger: true, onConfirm: () => { logout(); navigate("/login", { replace: true }); } });
