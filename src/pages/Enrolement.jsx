@@ -361,6 +361,16 @@ export default function Enrolement() {
         }
       }
 
+      // Associe le BADGE RFID saisi (table biométrie, type 'rfid'). Best-effort : un échec
+      // (badge déjà utilisé, etc.) n'empêche pas la création de l'employé.
+      if (form.badge.trim() && empId) {
+        try {
+          await apiPost(`/api/employes/${empId}/biometrie`, { type: "rfid", badge_rfid: form.badge.trim() });
+        } catch {
+          toast("Employé enregistré — le badge RFID n'a pas pu être associé (déjà utilisé ?)", "info");
+        }
+      }
+
       setDone(true);
       toast(`${prenom} ${nom} a été ${editMode ? "modifié" : "enrôlé"} avec succès`);
     } catch (err) {
