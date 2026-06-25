@@ -17,17 +17,13 @@ const champClass =
   "w-full h-10 rounded-[9px] bg-[#FBF9F4] border border-[#DAD4C5] px-3 text-[13.5px] text-[#2B2A27] placeholder:text-[#A39E90] outline-none transition focus:border-[#1E7D67] focus:ring-[3px] focus:ring-[#1E7D67]/20";
 
 const etapes = [
-  { id: 0, label: "Identité", sub: "Infos employé", icon: "person" },
-  { id: 1, label: "Empreinte", sub: "Biométrie", icon: "fingerprint" },
-  { id: 2, label: "Badge & PIN", sub: "Accès & code", icon: "badge" },
-  { id: 3, label: "Validation", sub: "Confirmation", icon: "verified" },
+  { id: 0, label: "Profil", sub: "Identité & poste", icon: "badge" },
+  { id: 1, label: "Accès", sub: "Empreinte, badge & validation", icon: "fingerprint" },
 ];
 
 const aide = {
-  0: "Renseignez le prénom, le nom et la fonction. Le matricule MADMEN est généré automatiquement.",
-  1: "Nettoyez le capteur, posez le doigt à plat et maintenez ~2 s. Trois passages améliorent la fiabilité.",
-  2: "Associez le badge RFID physique remis à l'employé et définissez un code PIN à 4 chiffres.",
-  3: "Vérifiez le récapitulatif. Une fois confirmé, l'employé pourra pointer immédiatement.",
+  0: "Renseignez l'identité et le poste. Seuls le prénom et le nom sont obligatoires — le reste se complète plus tard. Le matricule MADMEN est généré automatiquement.",
+  1: "Capturez l'empreinte (optionnel), associez le badge et le code PIN, puis validez. L'employé pourra pointer immédiatement.",
 };
 
 // Options des champs RH (listes fermées).
@@ -247,7 +243,7 @@ export default function Enrolement() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const empreinteOk = captures >= 3;
-  const pct = Math.round(((etape + 1) / 4) * 100);
+  const pct = Math.round(((etape + 1) / 2) * 100);
   const pinValide = /^\d{4}$/.test(form.pin);
   // Matricule affiché : le VRAI renvoyé par l'API une fois créé, sinon un placeholder.
   const matricule = cree?.matricule || (`${form.prenom} ${form.nom}`.trim() ? "AUR-…" : "AUR-————");
@@ -298,7 +294,7 @@ export default function Enrolement() {
   // Tout le reste peut être complété plus tard via « Modifier ».
   const peutEnvoyer = form.prenom.trim().length > 0 && form.nom.trim().length > 0 && atteste;
 
-  const suivant = () => setEtape((e) => Math.min(e + 1, 3));
+  const suivant = () => setEtape((e) => Math.min(e + 1, 1));
   const precedent = () => setEtape((e) => Math.max(e - 1, 0));
 
   // Création RÉELLE de l'employé. Sépare « nom complet » en prénom + nom, téléverse
@@ -477,7 +473,7 @@ export default function Enrolement() {
           </div>
           <h1 className="text-[28px] sm:text-[32px] font-medium text-white tracking-tight leading-tight">{editMode ? "Modifier l'employé" : "Nouvel employé"}</h1>
           <p className="text-[14px] text-white/[0.68] mt-2 max-w-md">
-            Enregistrez l'identité, l'empreinte et les accès en quatre étapes guidées.
+            Enregistrez l'identité, l'empreinte et les accès en deux étapes guidées.
           </p>
         </div>
       </div>
@@ -485,7 +481,7 @@ export default function Enrolement() {
       {/* Stepper (chevauche le bas du hero, connecteurs segmentés) */}
       <div className="relative -mt-6 px-2 sm:px-6">
         <div className="absolute top-[22px] left-[12%] right-[12%] h-[2px] bg-[#E6E1D4]" />
-        <div className="absolute top-[22px] left-[12%] h-[2px] bg-[#1C5C50] transition-all duration-500" style={{ width: `${(etape / 3) * 76}%` }} />
+        <div className="absolute top-[22px] left-[12%] h-[2px] bg-[#1C5C50] transition-all duration-500" style={{ width: `${etape * 76}%` }} />
         <div className="relative flex items-start justify-between gap-2">
           {etapes.map((e, i) => {
             const etat = i < etape ? "done" : i === etape ? "actif" : "avenir";
@@ -669,137 +665,112 @@ export default function Enrolement() {
               </div>
             )}
 
-            {/* Étape 1 — Empreinte */}
+            {/* Étape 1 — Accès : empreinte + badge/PIN + validation */}
             {etape === 1 && (
-              <div className="flex flex-col items-center justify-center py-3">
-                <div className="flex items-center gap-2 mb-6 text-[12px] font-medium text-[#6F6B60]">
-                  <span className="relative flex w-2 h-2">
-                    <span className="absolute inline-flex w-full h-full rounded-full bg-[#1E7D67]/40 animate-ping" />
-                    <span className="relative inline-flex w-2 h-2 rounded-full bg-[#1E7D67]" />
-                  </span>
-                  Lecteur connecté · Live20
-                </div>
-                <button
-                  onClick={scanner}
-                  disabled={scanning || empreinteOk}
-                  aria-label="Lancer la capture d'empreinte"
-                  className={`relative w-40 h-40 rounded-full flex items-center justify-center overflow-hidden transition-all duration-300 ${
-                    empreinteOk ? "bg-[#E7F0EC] ring-4 ring-[#E7F0EC]" : "bg-[#E7F0EC] hover:brightness-[0.97] ring-1 ring-[#DAD4C5] cursor-pointer"
-                  } ${scanning ? "ring-2 ring-[#1E7D67]/40" : ""}`}
-                >
-                  <Icon
-                    name={empreinteOk ? "check_circle" : "fingerprint"}
-                    filled
-                    className={`text-[78px] transition-colors duration-300 ${empreinteOk ? "text-[#1E7D67]" : "text-[#1C5C50]/70"}`}
-                    aria-hidden="true"
-                  />
-                  {scanning && (
-                    <>
-                      <span className="pointer-events-none absolute inset-x-0 h-12 bg-gradient-to-b from-transparent via-[#1E7D67]/45 to-transparent animate-scanline" />
-                      <span className="pointer-events-none absolute inset-0 rounded-full ring-4 ring-[#1E7D67]/30 animate-pulse" />
-                    </>
-                  )}
-                </button>
-                <p className="mt-5 text-[13.5px] font-medium text-[#2B2A27]">
-                  {empreinteOk ? "Empreinte enregistrée" : scanning ? "Capture en cours…" : "Posez le doigt sur le lecteur"}
-                </p>
-                <p className="text-[12px] text-[#8C8678] mt-1">
-                  {empreinteOk
-                    ? "Les 3 passages ont été capturés avec succès."
-                    : scanning
-                      ? "Maintenez le doigt immobile…"
-                      : `Passage ${Math.min(captures + 1, 3)} sur 3 — cliquez pour scanner`}
-                </p>
-                <div className="flex items-center gap-2 mt-5">
-                  {[0, 1, 2].map((i) => (
-                    <span
-                      key={i}
-                      className={`h-1.5 w-8 rounded-full transition-colors duration-300 ${
-                        i < captures ? "bg-[#1E7D67]" : i === captures && scanning ? "bg-[#1E7D67]/40 animate-pulse" : "bg-[#DAD4C5]"
-                      }`}
-                    />
-                  ))}
-                </div>
-                {!empreinteOk && (
-                  <p className="mt-6 text-[11.5px] text-[#8C8678] text-center max-w-[270px] leading-relaxed">
-                    Étape facultative — vous pouvez enregistrer l'employé maintenant et enrôler l'empreinte plus tard.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Étape 2 — Badge & PIN */}
-            {etape === 2 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-[14px]">
-                <Champ label="Numéro de badge RFID" full>
-                  <input className={champClass} value={form.badge} onChange={set("badge")} placeholder="Ex. RFID-00482" />
-                </Champ>
-                <Champ label="Code PIN (4 chiffres)">
-                  <input
-                    className={champClass}
-                    type="password"
-                    value={form.pin}
-                    onChange={(e) => setForm((f) => ({ ...f, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
-                    placeholder="••••"
-                    inputMode="numeric"
-                  />
-                </Champ>
-                <Champ label="Confirmation">
-                  <div
-                    className={`flex items-center gap-1.5 h-10 px-3 rounded-[9px] border text-[13px] ${
-                      pinValide ? "border-[#1E7D67]/30 bg-[#E7F0EC] text-[#1E7D67] font-medium" : "border-[#DAD4C5] bg-[#FBF9F4] text-[#A39E90]"
-                    }`}
-                  >
-                    {pinValide ? (
-                      <>
-                        <Icon name="check_circle" className="text-[18px]" filled aria-hidden="true" />
-                        Code valide
-                      </>
-                    ) : (
-                      "4 chiffres requis"
-                    )}
-                  </div>
-                </Champ>
-              </div>
-            )}
-
-            {/* Étape 3 — Validation */}
-            {etape === 3 && (
-              <div>
-                <div className="flex flex-col items-center text-center mb-5">
-                  <span className="w-12 h-12 rounded-full bg-[#E7F0EC] text-[#1E7D67] flex items-center justify-center">
-                    <Icon name="fact_check" filled className="text-[26px]" aria-hidden="true" />
-                  </span>
-                  <p className="mt-3 text-[15px] font-medium text-[#2B2A27]">Vérifiez les informations</p>
-                  <p className="text-[13px] text-[#6F6B60]">Relisez le récapitulatif avant de finaliser.</p>
-                </div>
-                <div className="rounded-[12px] border border-[#E6E1D4] divide-y divide-[#E6E1D4] overflow-hidden">
-                  {[
-                    ["Prénom et nom", `${form.prenom} ${form.nom}`.trim(), false, false],
-                    ["Téléphone", form.telephone, false, false],
-                    ["Fonction", form.fonction, false, false],
-                    ["Département", form.departement, false, false],
-                    ["Type de contrat", form.type_contrat, false, false],
-                    ["Date d'embauche", form.date_embauche, false, false],
-                    ["Contact d'urgence", form.contact_urgence_nom ? `${form.contact_urgence_nom}${form.contact_urgence_tel ? ` · ${form.contact_urgence_tel}` : ""}` : "", false, false],
-                    ["Empreinte", empreinteOk ? "Enregistrée (3 passages)" : "Non capturée", false, empreinteOk],
-                  ].map(([k, v, mono, ok]) => (
-                    <div key={k} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
-                      <span className="text-[13px] text-[#6F6B60]">{k}</span>
-                      <span className={`text-[13px] text-right ${ok ? "text-[#1E7D67] font-medium" : "text-[#2B2A27]"} ${mono ? "font-mono tabular-nums" : ""}`}>{v || "—"}</span>
+              <div className="space-y-6">
+                {/* 1 — Empreinte (optionnelle) */}
+                <Section num="1" titre="Empreinte (optionnelle)">
+                  <div className="flex flex-col items-center justify-center rounded-[12px] bg-[#FBF9F4] border border-[#E6E1D4] py-5 px-4">
+                    <div className="flex items-center gap-2 mb-4 text-[12px] font-medium text-[#6F6B60]">
+                      <span className="relative flex w-2 h-2">
+                        <span className="absolute inline-flex w-full h-full rounded-full bg-[#1E7D67]/40 animate-ping" />
+                        <span className="relative inline-flex w-2 h-2 rounded-full bg-[#1E7D67]" />
+                      </span>
+                      Lecteur connecté · Live20
                     </div>
-                  ))}
-                </div>
-                <label className="flex items-center gap-2.5 mt-4 text-[13px] text-[#2B2A27] cursor-pointer select-none">
-                  <input type="checkbox" checked={atteste} onChange={(e) => setAtteste(e.target.checked)} className="w-4 h-4 rounded accent-[#1E7D67]" />
-                  J'atteste l'exactitude des informations saisies.
-                </label>
-                {(!form.prenom.trim() || !form.nom.trim()) && (
-                  <p className="mt-3 flex items-center gap-1.5 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    <Icon name="warning" filled className="text-[15px] shrink-0" aria-hidden="true" />
-                    Le prénom et le nom sont obligatoires — renseignez-les à l'étape « Identité ».
-                  </p>
-                )}
+                    <button
+                      onClick={scanner}
+                      disabled={scanning || empreinteOk}
+                      aria-label="Lancer la capture d'empreinte"
+                      className={`relative w-32 h-32 rounded-full flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                        empreinteOk ? "bg-[#E7F0EC] ring-4 ring-[#E7F0EC]" : "bg-white hover:brightness-[0.98] ring-1 ring-[#DAD4C5] cursor-pointer"
+                      } ${scanning ? "ring-2 ring-[#1E7D67]/40" : ""}`}
+                    >
+                      <Icon
+                        name={empreinteOk ? "check_circle" : "fingerprint"}
+                        filled
+                        className={`text-[58px] transition-colors duration-300 ${empreinteOk ? "text-[#1E7D67]" : "text-[#1C5C50]/70"}`}
+                        aria-hidden="true"
+                      />
+                      {scanning && (
+                        <>
+                          <span className="pointer-events-none absolute inset-x-0 h-12 bg-gradient-to-b from-transparent via-[#1E7D67]/45 to-transparent animate-scanline" />
+                          <span className="pointer-events-none absolute inset-0 rounded-full ring-4 ring-[#1E7D67]/30 animate-pulse" />
+                        </>
+                      )}
+                    </button>
+                    <p className="mt-4 text-[13.5px] font-medium text-[#2B2A27]">
+                      {empreinteOk ? "Empreinte enregistrée" : scanning ? "Capture en cours…" : "Posez le doigt sur le lecteur"}
+                    </p>
+                    <p className="text-[12px] text-[#8C8678] mt-1 text-center">
+                      {empreinteOk
+                        ? "Les 3 passages ont été capturés avec succès."
+                        : scanning
+                          ? "Maintenez le doigt immobile…"
+                          : `Passage ${Math.min(captures + 1, 3)} sur 3 — facultatif, enrôlable plus tard`}
+                    </p>
+                    <div className="flex items-center gap-2 mt-4">
+                      {[0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          className={`h-1.5 w-8 rounded-full transition-colors duration-300 ${
+                            i < captures ? "bg-[#1E7D67]" : i === captures && scanning ? "bg-[#1E7D67]/40 animate-pulse" : "bg-[#DAD4C5]"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </Section>
+
+                {/* 2 — Badge & code PIN */}
+                <Section num="2" titre="Badge & code PIN">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-[14px]">
+                    <Champ label="Numéro de badge RFID" full>
+                      <input className={champClass} value={form.badge} onChange={set("badge")} placeholder="Ex. RFID-00482" />
+                    </Champ>
+                    <Champ label="Code PIN (4 chiffres)">
+                      <input
+                        className={champClass}
+                        type="password"
+                        value={form.pin}
+                        onChange={(e) => setForm((f) => ({ ...f, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                        placeholder="••••"
+                        inputMode="numeric"
+                      />
+                    </Champ>
+                    <Champ label="Confirmation">
+                      <div
+                        className={`flex items-center gap-1.5 h-10 px-3 rounded-[9px] border text-[13px] ${
+                          pinValide ? "border-[#1E7D67]/30 bg-[#E7F0EC] text-[#1E7D67] font-medium" : "border-[#DAD4C5] bg-[#FBF9F4] text-[#A39E90]"
+                        }`}
+                      >
+                        {pinValide ? (
+                          <>
+                            <Icon name="check_circle" className="text-[18px]" filled aria-hidden="true" />
+                            Code valide
+                          </>
+                        ) : (
+                          "4 chiffres requis"
+                        )}
+                      </div>
+                    </Champ>
+                  </div>
+                </Section>
+
+                {/* 3 — Validation */}
+                <Section num="3" titre="Validation">
+                  <label className="flex items-center gap-2.5 text-[13px] text-[#2B2A27] cursor-pointer select-none">
+                    <input type="checkbox" checked={atteste} onChange={(e) => setAtteste(e.target.checked)} className="w-4 h-4 rounded accent-[#1E7D67]" />
+                    J'atteste l'exactitude des informations saisies.
+                  </label>
+                  <p className="mt-2 text-[12px] text-[#8C8678]">Le récapitulatif complet est visible sur le badge, à droite.</p>
+                  {(!form.prenom.trim() || !form.nom.trim()) && (
+                    <p className="mt-3 flex items-center gap-1.5 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <Icon name="warning" filled className="text-[15px] shrink-0" aria-hidden="true" />
+                      Le prénom et le nom sont obligatoires — renseignez-les à l'étape « Profil ».
+                    </p>
+                  )}
+                </Section>
               </div>
             )}
           </div>
@@ -814,7 +785,7 @@ export default function Enrolement() {
               <Icon name="arrow_back" className="text-[16px]" aria-hidden="true" />
               Précédent
             </button>
-            {etape < 3 ? (
+            {etape < 1 ? (
               <button
                 onClick={suivant}
                 className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[9px] bg-[#1E7D67] text-white text-[13.5px] font-medium shadow-[0_6px_16px_-6px_rgba(30,125,103,0.5)] transition hover:bg-[#1C5C50] active:translate-y-px"
