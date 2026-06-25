@@ -8,6 +8,7 @@ import { apiGet, apiPost, apiDelete } from "../../lib/api.js";
 // Agent d'empreintes local (Live20R) — voir madmen-agent/zkagent.exe.
 const AGENT_URL = "http://127.0.0.1:8080";
 const PASSES = 3;
+const MAX_ROUNDS = 3; // essais complets avant échec honnête (revue P0-4 : pas de boucle infinie)
 
 // Doigts par main (valeur API alignée sur K40Template::FINGER_MAP).
 const MAIN_DROITE = [
@@ -62,9 +63,11 @@ const SCANNER_CSS = `
 `;
 
 /**
- * Enrôlement biométrique animé : scanner Live20R (3 passages), vue par doigt,
- * sauvegarde/chargement de fichier. La capture pousse le gabarit côté API ; le pont
- * reporter le synchronise au K40. (Le seuil de qualité 80 % réel = upgrade agent à venir.)
+ * Enrôlement biométrique animé : scanner Live20R (3 poses), vue par doigt,
+ * sauvegarde/chargement de fichier. Les 3 poses sont FUSIONNÉES par l'agent (POST /merge)
+ * avec une porte de qualité RÉELLE : cohérence deux-à-deux + re-vérification post-fusion +
+ * % auto-étalonné (barre 80 %). On stocke la FUSION (jamais une pose brute) ; le pont
+ * reporter la synchronise au K40.
  */
 export default function BiometrieModal({ open, onClose, employe }) {
   const { toast } = useUI();
@@ -79,6 +82,8 @@ export default function BiometrieModal({ open, onClose, employe }) {
   const [pulseKey, setPulseKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
+  const cancelRef = useRef(false);
+  const abortRef = useRef(null);
 
   const charger = useCallback(() => {
     if (!id) return;
@@ -97,58 +102,119 @@ export default function BiometrieModal({ open, onClose, employe }) {
   const ringDone = phase === "done" ? PASSES : pass;
   const dashoffset = 540 * (1 - ringDone / PASSES);
 
-  async function captureOne() {
-    const ctrl = new AbortController();
-    const minuteur = setTimeout(() => ctrl.abort(), 25000);
-    try {
-      const r = await fetch(`${AGENT_URL}/capture`, { method: "POST", body: "", signal: ctrl.signal });
-      if (!r.ok) throw new Error("Lecture échouée");
-      const j = await r.json();
-      if (!j.template) throw new Error("Doigt non détecté");
-      return j.template;
-    } finally {
-      clearTimeout(minuteur);
-    }
+  // Une pose. Renvoie le gabarit BRUT (entrée transitoire — jamais stocké tel quel).
+  async function captureOne(signal) {
+    const r = await fetch(`${AGENT_URL}/capture`, { method: "POST", body: "", signal });
+    if (r.status === 408) throw new Error("timeout");
+    if (r.status === 503) throw new Error("reader");
+    if (!r.ok) throw new Error("capture");
+    const j = await r.json();
+    if (!j.template) throw new Error("capture");
+    return j.template;
   }
 
+  const annuler = () => {
+    cancelRef.current = true;
+    try { abortRef.current?.abort(); } catch { /* ignore */ }
+  };
+
+  const echec = async (msg) => {
+    setPhase("error"); setStatusT("Échec"); setStatusS(msg);
+    toast(msg, "error");
+    await wait(2200); reset();
+  };
+
+  // Enrôlement : 3 poses -> /merge (cohérence + fusion + re-vérif + qualité) -> stocke la FUSION.
+  // Réessaie jusqu'à MAX_ROUNDS, annulable, échoue honnêtement plutôt que de boucler à l'infini.
   const demarrer = async () => {
     if (busy || !id) return;
-    setBusy(true); setPass(0);
-    let last = null;
+    setBusy(true); cancelRef.current = false;
     try {
-      for (let n = 1; n <= PASSES; n++) {
-        setPhase("scanning");
-        setStatusT("Posez le doigt…");
-        setStatusS(n < PASSES ? `Passage ${n} sur ${PASSES}` : "Dernier passage");
-        last = await captureOne();
-        setPhase("captured"); setPass(n); setPulseKey((k) => k + 1);
-        setStatusT("Capturé"); setStatusS("");
-        await wait(650);
-        if (n < PASSES) {
-          setPhase("between");
-          setStatusT(`Passage ${n} validé`); setStatusS("Retirez le doigt, puis reposez");
-          await wait(900);
+      let saved = false;
+      for (let round = 1; round <= MAX_ROUNDS && !saved; round++) {
+        if (cancelRef.current) { reset(); break; }
+        setPass(0);
+        const abort = new AbortController();
+        abortRef.current = abort;
+        const minuteur = setTimeout(() => abort.abort(), 25000);
+        const samples = [];
+        try {
+          for (let n = 1; n <= PASSES; n++) {
+            if (cancelRef.current) throw new Error("cancel");
+            setPhase("scanning"); setStatusT("Posez le doigt…");
+            setStatusS(n < PASSES ? `Passage ${n} sur ${PASSES}` : "Dernier passage");
+            samples.push(await captureOne(abort.signal));
+            setPhase("captured"); setPass(n); setPulseKey((k) => k + 1);
+            setStatusT("Capturé"); setStatusS("");
+            await wait(600);
+            if (n < PASSES) {
+              setPhase("between");
+              setStatusT(`Passage ${n} validé`); setStatusS("Retirez le doigt, puis reposez");
+              await wait(850);
+            }
+          }
+        } catch (e) {
+          clearTimeout(minuteur);
+          if (cancelRef.current || e?.message === "cancel") { reset(); break; }
+          setPhase("error"); setStatusT("Capture interrompue");
+          setStatusS(
+            e?.message === "reader" ? "Lecteur indisponible — l'agent est-il lancé ?"
+              : e?.message === "timeout" || e?.name === "AbortError" ? "Délai dépassé — aucun doigt détecté"
+              : "Reposez le doigt bien à plat"
+          );
+          toast("Capture interrompue", "error");
+          await wait(1800); reset(); break;
         }
+        clearTimeout(minuteur);
+        if (cancelRef.current) { reset(); break; }
+
+        // Fusion + qualité côté agent (annulable + délai propre — revue P0-3).
+        setPhase("saving"); setStatusT("Analyse de la qualité…"); setStatusS("");
+        const mergeTimer = setTimeout(() => abort.abort(), 15000);
+        let mr;
+        try {
+          const res = await fetch(`${AGENT_URL}/merge`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ samples }), signal: abort.signal,
+          });
+          clearTimeout(mergeTimer);
+          if (res.status === 503) { await echec("Moteur d'empreintes indisponible — redémarrez l'agent."); break; }
+          if (res.status === 400) { await echec("Données de capture invalides."); break; }
+          if (res.status === 422) {
+            if (round < MAX_ROUNDS) { setPhase("error"); setStatusT("Fusion impossible"); setStatusS(`Recommencez (essai ${round}/${MAX_ROUNDS})`); await wait(1500); continue; }
+            await echec("Fusion impossible après plusieurs essais."); break;
+          }
+          mr = await res.json();
+        } catch (e) {
+          clearTimeout(mergeTimer);
+          if (cancelRef.current) { reset(); break; }
+          await echec(e?.name === "AbortError" ? "Analyse trop longue — réessayez." : "Agent injoignable — l'agent est-il lancé ?");
+          break;
+        }
+
+        // Annulation pendant l'analyse -> on NE stocke PAS (revue P0-3).
+        if (cancelRef.current) { reset(); break; }
+
+        if (!mr.accepted) {
+          if (round < MAX_ROUNDS) {
+            setPhase("error");
+            setStatusT(mr.reason === "low_quality" ? "Qualité insuffisante" : "Empreintes incohérentes");
+            setStatusS(`${mr.message || "Recommencez"} (essai ${round}/${MAX_ROUNDS})`);
+            await wait(1900); continue;
+          }
+          await echec(mr.message || "Qualité insuffisante après plusieurs essais."); break;
+        }
+
+        // ACCEPTÉ — on stocke la FUSION (mr.template), JAMAIS une pose brute.
+        await apiPost(`/api/employes/${id}/biometrie`, { type: "empreinte", template: mr.template, doigt });
+        setPhase("done"); setStatusT("Empreinte enregistrée");
+        setStatusS(`${labelDoigt(doigt)}${mr.quality != null ? ` · qualité ${mr.quality} %` : " · qualité validée"}`);
+        toast(`Empreinte « ${labelDoigt(doigt)} » enregistrée`, "success");
+        charger(); saved = true;
+        await wait(1600); reset();
       }
-      setPhase("saving"); setStatusT("Enregistrement…"); setStatusS("");
-      await apiPost(`/api/employes/${id}/biometrie`, { type: "empreinte", template: last, doigt });
-      setPhase("done"); setStatusT("Empreinte enregistrée"); setStatusS(`${labelDoigt(doigt)} · qualité —`);
-      toast(`Empreinte « ${labelDoigt(doigt)} » enregistrée`, "success");
-      charger();
-      await wait(1600);
-      reset();
-    } catch (err) {
-      setPhase("error"); setStatusT("Capture interrompue");
-      setStatusS(
-        err?.name === "AbortError" ? "Délai dépassé — aucun doigt détecté"
-          : err?.message === "Doigt non détecté" ? "Reposez le doigt bien à plat"
-          : "Lecteur indisponible — l'agent est-il lancé ?"
-      );
-      toast("Capture interrompue", "error");
-      await wait(2000);
-      reset();
     } finally {
-      setBusy(false);
+      setBusy(false); abortRef.current = null;
     }
   };
 
@@ -245,8 +311,8 @@ export default function BiometrieModal({ open, onClose, employe }) {
           <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={chargerFichier} />
           <Button variant="ghost" icon="upload_file" onClick={() => fileRef.current?.click()} disabled={busy}>Charger</Button>
           <Button variant="secondary" icon="download" onClick={enregistrerFichier} disabled={busy}>Enregistrer</Button>
-          <Button variant="primary" icon={busy ? "progress_activity" : "play_arrow"} onClick={demarrer} disabled={busy}>
-            {busy ? "Capture…" : "Démarrer la capture"}
+          <Button variant={busy ? "danger" : "primary"} icon={busy ? "stop_circle" : "play_arrow"} onClick={busy ? annuler : demarrer}>
+            {busy ? "Annuler" : "Démarrer la capture"}
           </Button>
         </>
       }
