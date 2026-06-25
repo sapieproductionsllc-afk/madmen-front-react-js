@@ -130,34 +130,31 @@ export default function ProfilEmploye() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
   const [jourEdit, setJourEdit] = useState(null); // jour du calendrier en édition (pointage manuel)
+  const [salaireNet, setSalaireNet] = useState(null); // net du mois (passé au bandeau -> évite un 2e fetch paie)
 
   useEffect(() => {
     let actif = true;
     if (!e) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
     setErreur(null);
 
-    // Employé (liste -> recherche par matricule, le param :id est le matricule)
-    // + présence temps réel (agents[] de /api/dashboard/presence indexé par matricule).
-    Promise.all([apiGet("/api/employes"), apiGet("/api/dashboard/presence")])
-      .then(([employesData, presence]) => {
-        if (!actif) return null;
-
-        const agentApi = (Array.isArray(employesData) ? employesData : []).find((x) => x.matricule === id);
-        const agent = agentApi ? mapEmploye(agentApi) : null;
-
-        const ag = (presence?.agents ?? []).find((a) => a.matricule === id || a.id === agentApi?.id);
-        const statutLive = ag ? STATUT_LIVE[ag.statut] ?? "Absent" : "Absent";
-
+    const moisCourant = new Date().toISOString().slice(0, 7); // AAAA-MM
+    // Profil RAPIDE : on ne tire QUE cet employé (statut live inclus dans `today`) + son
+    // bulletin du mois, EN PARALLÈLE. Plus de liste complète ni d'appel /presence.
+    // Les endpoints acceptent le matricule (= :id de l'URL).
+    Promise.all([
+      apiGet(`/api/employes/${id}`),
+      apiGet(`/api/employes/${id}/paie?mois=${moisCourant}`).catch(() => null),
+    ])
+      .then(([employeApi, paie]) => {
+        if (!actif) return;
+        const agent = employeApi ? mapEmploye(employeApi) : null;
+        const statutApi = employeApi?.today?.statut ?? null;
         setE(agent);
-        setLive(statutLive);
-
-        // Calendrier de présence : bulletin de paie du mois courant (par id numérique).
-        if (!agentApi?.id) return null;
-        const moisCourant = new Date().toISOString().slice(0, 7); // AAAA-MM
-        return apiGet(`/api/employes/${agentApi.id}/paie?mois=${moisCourant}`);
-      })
-      .then((paie) => {
-        if (actif && paie) setCal(construireCalendrier(paie));
+        setLive(statutApi ? STATUT_LIVE[statutApi] ?? "Absent" : "Absent");
+        if (paie) {
+          setCal(construireCalendrier(paie));
+          setSalaireNet(Number(paie.salaire_net) || 0);
+        }
       })
       .catch((err) => {
         if (actif) setErreur(err?.message || "Erreur de chargement");
@@ -240,6 +237,7 @@ export default function ProfilEmploye() {
         onPlus={() => navigate(`/employes/${id}/details`)}
         plusLabel="Détails & modification"
         plusIcon="edit_note"
+        salaireNet={salaireNet}
       />
 
       {/* Calendrier de présence — clic sur un jour = saisir/corriger arrivée & départ */}

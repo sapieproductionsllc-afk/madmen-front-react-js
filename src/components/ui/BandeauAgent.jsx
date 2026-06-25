@@ -28,7 +28,7 @@ const focusOr = "focus:outline-none focus-visible:ring-2 focus-visible:ring-or-4
 
 // Bandeau profil agent (vert sapin) — partagé entre la fiche Présence et la page Détails.
 // Actions : Paiements · bouton fusionné détails/modification (onPlus) · menu burger (actions admin).
-export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, onPaiements, onPlus, plusLabel = "Plus de détails", plusIcon = "chevron_right" }) {
+export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, onPaiements, onPlus, plusLabel = "Plus de détails", plusIcon = "chevron_right", salaireNet = null }) {
   const [showSalaire, setShowSalaire] = useState(true);
 
   // Infos affichées (nom / fonction / contact / salaire net du bulletin).
@@ -44,18 +44,20 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
     photo: null,
   });
 
-  // Fiche de paie résumée RÉELLE du mois courant -> alimente le salaire net affiché.
-  // L'id numérique sert au endpoint (e._id) ; repli sur e.id si absent.
+  // Salaire net : fourni par le parent (profil rapide) -> AUCUNE requête. Sinon (page
+  // Détails, etc.) on charge le bulletin du mois nous-même (repli).
   useEffect(() => {
+    if (salaireNet != null) {
+      setInfo((prev) => ({ ...prev, salaire: salaireNet }));
+      return undefined;
+    }
     let actif = true;
     const idPaie = e._id ?? e.id;
     if (!idPaie) return undefined;
     const moisCourant = new Date().toISOString().slice(0, 7); // AAAA-MM
     apiGet(`/api/employes/${idPaie}/paie?mois=${moisCourant}`)
       .then((p) => {
-        if (!actif) return;
-        const paie = mapPaie(p);
-        setInfo((prev) => ({ ...prev, salaire: paie.net }));
+        if (actif) setInfo((prev) => ({ ...prev, salaire: mapPaie(p).net }));
       })
       .catch(() => {
         /* repli neutre : salaire reste à 0 si le bulletin est indisponible */
@@ -63,7 +65,7 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
     return () => {
       actif = false;
     };
-  }, [e._id, e.id]);
+  }, [e._id, e.id, salaireNet]);
 
   const showDept = info.department && !info.fonction.toLowerCase().includes(info.department.toLowerCase());
 
