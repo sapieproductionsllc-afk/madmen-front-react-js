@@ -36,7 +36,9 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
 
   // Infos affichées (modifiables par l'admin via la modale).
   const [info, setInfo] = useState({
-    name: e.name,
+    name: e.name || `${e.prenom ?? ""} ${e.nom ?? ""}`.trim(),
+    prenom: e.prenom ?? "",
+    nom: e.nom ?? "",
     fonction: e.matiere ?? e.fonction,
     department: e.department ?? "",
     email: e.email,
@@ -79,11 +81,14 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
   };
   const enregistrer = () => {
     const email = form.email.trim();
-    if (!form.name.trim() || !email) return toast("Nom et e-mail requis", "error");
+    const prenom = form.prenom.trim();
+    const nom = form.nom.trim();
+    if (!prenom || !nom || !email) return toast("Prénom, nom et e-mail requis", "error");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast("Adresse e-mail invalide", "error");
-    setInfo({ ...form, name: form.name.trim(), email, salaire: Number(form.salaire) || 0 });
+    const name = `${prenom} ${nom}`.trim();
+    setInfo({ ...form, prenom, nom, name, email, salaire: Number(form.salaire) || 0 });
     setEditOuvert(false);
-    toast(`Informations de ${form.name.trim()} mises à jour`, "success");
+    toast(`Informations de ${name} mises à jour`, "success");
   };
 
   const showDept = info.department && !info.fonction.toLowerCase().includes(info.department.toLowerCase());
@@ -184,7 +189,8 @@ export default function BandeauAgent({ e, live = "Absent", tauxHoraire = 1300, o
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Nom complet *" className="sm:col-span-2"><Input value={form.name} onChange={maj("name")} placeholder="Ex. Jean Dupont" /></Field>
+          <Field label="Prénom *"><Input value={form.prenom} onChange={maj("prenom")} placeholder="Ex. Jean" /></Field>
+          <Field label="Nom *"><Input value={form.nom} onChange={maj("nom")} placeholder="Ex. Dupont" /></Field>
           <Field label="Fonction"><Input value={form.fonction} onChange={maj("fonction")} placeholder="Ex. Comptable" /></Field>
           <Field label="Service / agence"><Input value={form.department} onChange={maj("department")} placeholder="Ex. Siège social" /></Field>
           <Field label="Adresse e-mail *" className="sm:col-span-2"><Input type="email" value={form.email} onChange={maj("email")} placeholder="prenom.nom@madmen.io" /></Field>
