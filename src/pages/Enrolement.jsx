@@ -545,8 +545,11 @@ export default function Enrolement() {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-[14px]">
-                    <Champ label="Nom et prénom *" full>
-                      <input className={champClass} value={form.nom} onChange={set("nom")} placeholder="Ex. Jean Dupont" autoFocus />
+                    <Champ label="Prénom *">
+                      <input className={champClass} value={form.prenom} onChange={set("prenom")} placeholder="Ex. Jean" autoFocus />
+                    </Champ>
+                    <Champ label="Nom *">
+                      <input className={champClass} value={form.nom} onChange={set("nom")} placeholder="Ex. Dupont" />
                     </Champ>
                     <Champ label="Sexe">
                       <select className={`${champClass} appearance-none`} value={form.sexe} onChange={set("sexe")}>
