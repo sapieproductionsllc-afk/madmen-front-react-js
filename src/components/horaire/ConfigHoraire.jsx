@@ -21,6 +21,8 @@ const JOURS = [
 const DEFAUT = {
   heure_arrivee: "08:00",
   heure_depart: "17:00",
+  pause_debut: "12:30",
+  pause_fin: "14:00",
   jours: [1, 2, 3, 4, 5],
   tolerance_minutes: 10,
   avance_minutes: 30,
@@ -59,6 +61,8 @@ function normaliser(h) {
     return {
       heure_arrivee: toHHMM(premier.debut) || DEFAUT.heure_arrivee,
       heure_depart: toHHMM(premier.fin) || DEFAUT.heure_depart,
+      pause_debut: toHHMM(h.pause_debut) || DEFAUT.pause_debut,
+      pause_fin: toHHMM(h.pause_fin) || DEFAUT.pause_fin,
       jours,
       tolerance_minutes: tolerance,
       avance_minutes: avanceMin,
@@ -70,6 +74,8 @@ function normaliser(h) {
   return {
     heure_arrivee: toHHMM(h.heure_arrivee) || DEFAUT.heure_arrivee,
     heure_depart: toHHMM(h.heure_depart) || DEFAUT.heure_depart,
+    pause_debut: toHHMM(h.pause_debut) || DEFAUT.pause_debut,
+    pause_fin: toHHMM(h.pause_fin) || DEFAUT.pause_fin,
     jours: h.jours_travailles != null ? parseJours(h.jours_travailles) : DEFAUT.jours,
     tolerance_minutes: tolerance,
     avance_minutes: avanceMin,
@@ -180,12 +186,20 @@ export default function ConfigHoraire({ employeId, onSaved }) {
         const c = form.planning[iso] || {};
         planning[String(iso)] = { debut: c.debut, fin: c.fin };
       }
-      payload = { planning, tolerance_minutes: tolerance, avance_minutes: avanceMin };
+      payload = {
+        planning,
+        pause_debut: form.pause_debut,
+        pause_fin: form.pause_fin,
+        tolerance_minutes: tolerance,
+        avance_minutes: avanceMin,
+      };
     } else {
       // Mode simple : mêmes heures pour tous les jours travaillés.
       payload = {
         heure_arrivee: form.heure_arrivee,
         heure_depart: form.heure_depart,
+        pause_debut: form.pause_debut,
+        pause_fin: form.pause_fin,
         jours_travailles: [...form.jours].sort((a, b) => a - b).join(","),
         tolerance_minutes: tolerance,
         avance_minutes: avanceMin,
@@ -304,6 +318,16 @@ export default function ConfigHoraire({ employeId, onSaved }) {
           )}
         </div>
       )}
+
+      {/* Pause déjeuner : fenêtre fixe (sortie/retour pointés ; retour après la fin = retard) */}
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Début de la pause déjeuner">
+          <TimePicker value={form.pause_debut} onChange={(v) => set({ pause_debut: v })} />
+        </Field>
+        <Field label="Fin de la pause (retour au plus tard)">
+          <TimePicker value={form.pause_fin} onChange={(v) => set({ pause_fin: v })} />
+        </Field>
+      </div>
 
       {/* Tolérances : retard et arrivée en avance */}
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
