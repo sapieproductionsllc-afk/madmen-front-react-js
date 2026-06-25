@@ -1,173 +1,225 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Icon from "../components/ui/Icon.jsx";
-import Button from "../components/ui/Button.jsx";
 import Avatar from "../components/ui/Avatar.jsx";
-import { FilterSelect } from "../components/ui/Input.jsx";
+import PointageJourModal from "../components/pointage/PointageJourModal.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { apiGet } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/160?u=${encodeURIComponent(id)}`;
-const STATUTS = ["Présent", "Retard", "Absent", "Congé"];
-const TONE_TXT = { Présent: "text-emerald-600", Retard: "text-amber-600", Absent: "text-rose-600", Congé: "text-sky-600" };
-// Présence effective attendue sur une journée standard : 08:30→18:00 moins 1h de
-// pause déjeuner = 8h = 480 min (cf. config/presence.php côté API). Sert de base
-// au calcul du % de travail (minutes travaillées / minutes attendues).
-const MIN_ATTENDUES = 480;
-// Repli quand l'API ne renvoie pas de temps travaillé (donnée partielle) : on
-// évite d'afficher 0% à tort pour un présent/retard sans minutes calculées.
-const PCT_REPLI = { Présent: 100, Retard: 90, Absent: 0, Congé: 0 };
+const PERIODES = ["Jour", "Semaine", "Mois", "Année"];
 const MOIS_AB = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const MOIS_LONG = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
-const PERIODES = ["Jour", "Semaine", "Mois", "Année"];
-const MOIS_COURANT = new Date().getMonth(); // mois de référence pour le filtre « Mois »
-const champTime =
-  "w-[5rem] rounded-lg bg-canvas border border-border px-2 py-1 text-sm font-mono tabular-nums text-texte outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15";
+const JOURS_AB = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."];
+const TONE = { Présent: "bg-emerald-50 text-emerald-700", Retard: "bg-amber-50 text-amber-700", Absent: "bg-rose-50 text-rose-600", Congé: "bg-sky-50 text-sky-700" };
+// Statut API (enum, 'parti' = journée terminée) -> libellé. Le retard est affiché à part.
+const STATUT_API = { present: "Présent", retard: "Retard", absent: "Absent", conge: "Congé", parti: "Présent" };
 
-// Statut API (enum) -> libellé attendu par le JSX.
-const STATUT_API = { present: "Présent", retard: "Retard", absent: "Absent", conge: "Congé" };
-// DATETIME 'YYYY-MM-DD HH:MM:SS' -> 'HH:MM' ; '--:--' si absent.
+const p2 = (x) => String(x).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 const heure = (dt) => (dt ? String(dt).slice(11, 16) : "--:--");
-// minutes -> 'Xh MM' ; '—' si rien.
-const dureeHm = (min) => (min && min > 0 ? `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}` : "—");
+const dureeHm = (min) => (min && min > 0 ? `${Math.floor(min / 60)}h${p2(min % 60)}` : "—");
 
-// % de travail calculé depuis les données API : minutes travaillées
-// (temps_present_minutes, déjà borné par l'horaire côté API) / minutes attendues.
-// Repli sur le statut si l'API ne renvoie pas de temps exploitable.
-function pourcentageDe(p, statut) {
-  const min = Number(p.temps_present_minutes);
-  if (Number.isFinite(min) && min > 0) {
-    return Math.max(0, Math.min(100, Math.round((min / MIN_ATTENDUES) * 100)));
-  }
-  return PCT_REPLI[statut] ?? 0;
+const lundiDe = (d) => { const x = new Date(d); const j = (x.getDay() + 6) % 7; x.setDate(x.getDate() - j); x.setHours(0, 0, 0, 0); return x; };
+const addJours = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const addMois = (d, n) => { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; };
+
+// Plage [début, fin] (objets Date) pour la période + date de référence.
+function plage(periode, ref) {
+  if (periode === "Jour") return [ref, ref];
+  if (periode === "Semaine") { const s = lundiDe(ref); return [s, addJours(s, 6)]; }
+  if (periode === "Mois") return [new Date(ref.getFullYear(), ref.getMonth(), 1), new Date(ref.getFullYear(), ref.getMonth() + 1, 0)];
+  return [new Date(ref.getFullYear(), 0, 1), new Date(ref.getFullYear(), 11, 31)];
+}
+function decaler(periode, ref, sens) {
+  if (periode === "Jour") return addJours(ref, sens);
+  if (periode === "Semaine") return addJours(ref, sens * 7);
+  if (periode === "Mois") return addMois(ref, sens);
+  return addMois(ref, sens * 12);
+}
+function labelPeriode(periode, ref) {
+  if (periode === "Jour") return ref.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  if (periode === "Semaine") { const [s, e] = plage("Semaine", ref); return `Semaine du ${s.getDate()} ${MOIS_AB[s.getMonth()]} au ${e.getDate()} ${MOIS_AB[e.getMonth()]}`; }
+  if (periode === "Mois") return `${MOIS_LONG[ref.getMonth()]} ${ref.getFullYear()}`;
+  return `${ref.getFullYear()}`;
 }
 
-// Pointage API -> ligne attendue par le JSX (mêmes champs que le mock).
 function mapPointage(p) {
   const statut = STATUT_API[p.statut] || "Absent";
   const d = p.date ? new Date(p.date + "T00:00:00") : null;
+  const ret = Number(p.retard_minutes) || 0;
   return {
-    mois: d ? d.getMonth() : MOIS_COURANT,
-    date: d ? `${d.getDate()} ${MOIS_AB[d.getMonth()]}` : "—",
+    rawDate: p.date,
+    mois: d ? d.getMonth() : 0,
+    dateLabel: d ? `${JOURS_AB[(d.getDay() + 6) % 7]} ${d.getDate()} ${MOIS_AB[d.getMonth()]}` : "—",
     arrivee: heure(p.heure_entree),
     depart: heure(p.heure_sortie),
     temps: dureeHm(p.temps_present_minutes),
+    retard: ret > 0 ? `+${ret} min` : "—",
     statut,
-    pourcentage: pourcentageDe(p, statut),
   };
 }
 
-const tranche = (p, tous) =>
-  p === "Jour" ? tous.slice(-1) : p === "Semaine" ? tous.slice(-5) : p === "Mois" ? tous.filter((j) => j.mois === MOIS_COURANT) : [];
+function Centre({ icon, spin, rose, texte, retour }) {
+  return (
+    <div className="card py-16 text-center max-w-lg mx-auto">
+      <Icon name={icon} className={`text-[40px] ${spin ? "text-brand-600 animate-spin" : rose ? "text-rose-500" : "text-faint"}`} />
+      <p className="mt-2 text-sm text-muted">{texte}</p>
+      {retour && (
+        <button onClick={retour} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700">
+          <Icon name="arrow_back" className="text-[18px]" /> Retour au tableau de bord
+        </button>
+      )}
+    </div>
+  );
+}
 
-// Feuille de pointage d'UN agent — éditable, filtrable par période.
+const StatutBadge = ({ statut }) => (
+  <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${TONE[statut] ?? "bg-surface-2 text-muted"}`}>{statut}</span>
+);
+
+function TableJours({ rows, loading, onJour }) {
+  return (
+    <>
+      <div className="px-4 sm:px-5 py-3 border-b border-border flex items-center gap-1.5 text-xs text-muted">
+        <Icon name="touch_app" className="text-brand-600 text-[18px]" /> Touchez un jour pour corriger l'arrivée ou le départ.
+      </div>
+      <div className="overflow-x-auto scroll-thin">
+        <table className="w-full text-sm min-w-[640px]">
+          <thead>
+            <tr className="text-left text-xs text-subtle border-b border-border">
+              <th className="px-5 py-3 font-medium">Date</th>
+              <th className="px-3 py-3 font-medium">Arrivée</th>
+              <th className="px-3 py-3 font-medium">Départ</th>
+              <th className="px-3 py-3 font-medium">Heures</th>
+              <th className="px-3 py-3 font-medium">Retard</th>
+              <th className="px-5 py-3 font-medium">Statut</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.map((r) => (
+              <tr key={r.rawDate} onClick={() => onJour(r)} className="hover:bg-surface-2/60 cursor-pointer transition-colors">
+                <td className="px-5 py-2.5 font-medium text-texte whitespace-nowrap capitalize">{r.dateLabel}</td>
+                <td className="px-3 py-2.5 font-mono tabular-nums text-texte">{r.arrivee}</td>
+                <td className="px-3 py-2.5 font-mono tabular-nums text-texte">{r.depart}</td>
+                <td className="px-3 py-2.5 tabular-nums text-muted">{r.temps}</td>
+                <td className={`px-3 py-2.5 tabular-nums ${r.retard !== "—" ? "text-amber-600 font-medium" : "text-muted"}`}>{r.retard}</td>
+                <td className="px-5 py-2.5"><StatutBadge statut={r.statut} /></td>
+              </tr>
+            ))}
+            {!loading && rows.length === 0 && (
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-muted">Aucun pointage sur cette période.</td></tr>
+            )}
+            {loading && rows.length === 0 && (
+              <tr><td colSpan={6} className="px-5 py-10 text-center"><Icon name="progress_activity" className="animate-spin text-[22px] text-brand-600" /></td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function SyntheseAnnee({ annee, vide }) {
+  return (
+    <div className="overflow-x-auto scroll-thin">
+      <table className="w-full text-sm min-w-[560px]">
+        <thead>
+          <tr className="text-left text-xs text-subtle border-b border-border">
+            <th className="px-5 py-3 font-medium">Mois</th>
+            <th className="px-3 py-3 font-medium">Jours pointés</th>
+            <th className="px-3 py-3 font-medium">Présences</th>
+            <th className="px-3 py-3 font-medium">Retards</th>
+            <th className="px-5 py-3 font-medium">Absences / congés</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {annee.map((m) => (
+            <tr key={m.mois} className="hover:bg-surface-2/50">
+              <td className="px-5 py-3 font-medium text-texte">{m.nom}</td>
+              <td className="px-3 py-3 tabular-nums text-muted">{m.jours}</td>
+              <td className="px-3 py-3 tabular-nums text-emerald-600 font-medium">{m.presents}</td>
+              <td className="px-3 py-3 tabular-nums text-amber-600 font-medium">{m.retards}</td>
+              <td className="px-5 py-3 tabular-nums text-muted">{m.absents} / {m.conges}</td>
+            </tr>
+          ))}
+          {vide && <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-muted">Aucun pointage cette année.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Feuille de pointage d'UN agent — données réelles, filtrable par période, éditable au clic.
 export default function Pointages() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { toast, dataVersion } = useUI();
+  const { dataVersion } = useUI();
 
   const [e, setE] = useState(null);
-  const [tous, setTous] = useState([]);
+  const [pointages, setPointages] = useState([]);
+  const [periode, setPeriode] = useState("Semaine");
+  const [ref, setRef] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
+  const [jourEdit, setJourEdit] = useState(null);
   const [chargement, setChargement] = useState(true);
+  const [chargePointages, setChargePointages] = useState(false);
   const [erreur, setErreur] = useState(null);
 
+  // Employé (en-tête + id numérique pour le modal) — endpoint accepte le matricule.
   useEffect(() => {
-    if (!e) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
-    setErreur(null);
-    apiGet("/api/pointages")
-      .then((data) => {
-        const rows = Array.isArray(data) ? data : [];
-        // L'agent est identifié par son matricule OU son id numérique dans l'URL.
-        const sien = rows.filter((p) => String(p.employe_id) === String(id) || String(p.matricule) === String(id));
-        const base = sien[0] || {};
-        // En-tête agent via mapEmploye (champs absents -> valeurs neutres, rien ne casse).
-        setE(mapEmploye({
-          matricule: base.matricule ?? id,
-          id: base.employe_id ?? null,
-          name: base.name ?? "",
-          poste_libelle: base.poste_libelle ?? "",
-          departement_nom: base.departement_nom ?? "",
-          statut: base.statut_employe ?? null,
-          today: base,
-        }));
-        setTous(sien.map(mapPointage));
-      })
-      .catch((err) => setErreur(err.message || "Erreur de chargement"))
-      .finally(() => setChargement(false));
-  }, [id, dataVersion]);
+    let actif = true;
+    setChargement(true); setErreur(null);
+    apiGet(`/api/employes/${id}`)
+      .then((emp) => { if (actif) setE(mapEmploye(emp)); })
+      .catch((err) => { if (actif) setErreur(err?.message || "Erreur de chargement"); })
+      .finally(() => { if (actif) setChargement(false); });
+    return () => { actif = false; };
+  }, [id]);
 
+  // Pointages de la plage (serveur : employe_id=matricule + from/to).
+  const [from, to] = plage(periode, ref);
+  const fromY = ymd(from);
+  const toY = ymd(to);
+  useEffect(() => {
+    let actif = true;
+    setChargePointages(true);
+    apiGet(`/api/pointages?employe_id=${encodeURIComponent(id)}&from=${fromY}&to=${toY}`)
+      .then((data) => { if (actif) setPointages(Array.isArray(data) ? data.map(mapPointage) : []); })
+      .catch(() => { if (actif) setPointages([]); })
+      .finally(() => { if (actif) setChargePointages(false); });
+    return () => { actif = false; };
+  }, [id, fromY, toY, dataVersion]);
+
+  // Synthèse mensuelle (vue Année).
   const annee = useMemo(() => {
     const parMois = {};
-    tous.forEach((j) => { (parMois[j.mois] ||= []).push(j); });
+    pointages.forEach((j) => { (parMois[j.mois] ||= []).push(j); });
     return Object.keys(parMois).map((m) => {
       const arr = parMois[m];
-      const compter = (s) => arr.filter((j) => j.statut === s).length;
-      return {
-        mois: Number(m), nom: MOIS_LONG[m], jours: arr.length,
-        presents: compter("Présent") + compter("Retard"), retards: compter("Retard"),
-        absents: compter("Absent"), conges: compter("Congé"),
-        moy: Math.round(arr.reduce((s, j) => s + j.pourcentage, 0) / arr.length),
-      };
-    });
-  }, [tous]);
+      const c = (s) => arr.filter((j) => j.statut === s).length;
+      return { mois: Number(m), nom: MOIS_LONG[m], jours: arr.length, presents: c("Présent") + c("Retard"), retards: c("Retard"), absents: c("Absent"), conges: c("Congé") };
+    }).sort((a, b) => a.mois - b.mois);
+  }, [pointages]);
 
-  const [periode, setPeriode] = useState("Semaine");
-  const [rows, setRows] = useState([]);
-  useEffect(() => { if (periode !== "Année") setRows(tranche(periode, tous)); }, [periode, tous]);
+  if (chargement) return <Centre icon="progress_activity" spin texte="Chargement des pointages…" />;
+  if (erreur) return <Centre icon="error" rose texte={erreur} retour={() => navigate("/")} />;
+  if (!e) return <Centre icon="person_off" texte={`Agent introuvable (${id}).`} retour={() => navigate("/")} />;
 
-  if (chargement) {
-    return (
-      <div className="card py-16 text-center max-w-lg mx-auto">
-        <Icon name="progress_activity" className="text-brand-600 text-[40px] animate-spin" />
-        <p className="mt-2 text-sm text-muted">Chargement des pointages…</p>
-      </div>
-    );
-  }
-
-  if (erreur) {
-    return (
-      <div className="card py-16 text-center max-w-lg mx-auto">
-        <Icon name="error" className="text-rose-500 text-[40px]" />
-        <p className="mt-2 text-sm text-muted">{erreur}</p>
-        <button onClick={() => navigate("/")} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700">
-          <Icon name="arrow_back" className="text-[18px]" /> Retour au tableau de bord
-        </button>
-      </div>
-    );
-  }
-
-  if (!e) {
-    return (
-      <div className="card py-16 text-center max-w-lg mx-auto">
-        <Icon name="person_off" className="text-faint text-[40px]" />
-        <p className="mt-2 text-sm text-muted">Agent introuvable ({id}).</p>
-        <button onClick={() => navigate("/")} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700">
-          <Icon name="arrow_back" className="text-[18px]" /> Retour au tableau de bord
-        </button>
-      </div>
-    );
-  }
-
-  const maj = (i, champ, val) => setRows((list) => list.map((r, idx) => (idx === i ? { ...r, [champ]: val } : r)));
-  const majPct = (i, val) => maj(i, "pourcentage", Math.max(0, Math.min(100, Number(val) || 0)));
-  const enregistrer = () => toast(`Pointages de ${e.name} enregistrés.`, "success");
-
-  const moyenne = periode === "Année"
-    ? (tous.length ? Math.round(tous.reduce((s, j) => s + j.pourcentage, 0) / tous.length) : 0)
-    : (rows.length ? Math.round(rows.reduce((s, r) => s + r.pourcentage, 0) / rows.length) : 0);
+  const ouvrir = (r) => setJourEdit({
+    date: r.rawDate,
+    arrivee: r.arrivee === "--:--" ? "" : r.arrivee,
+    depart: r.depart === "--:--" ? "" : r.depart,
+  });
 
   return (
     <div className="space-y-4 pb-10">
-      <button
-        onClick={() => navigate(-1)}
-        className="group inline-flex items-center gap-1.5 h-9 pl-2 pr-3.5 rounded-full bg-surface border border-border text-sm font-medium text-muted hover:text-ink hover:border-border-strong hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-      >
+      <button onClick={() => navigate(-1)} className="group inline-flex items-center gap-1.5 h-9 pl-2 pr-3.5 rounded-full bg-surface border border-border text-sm font-medium text-muted hover:text-ink hover:border-border-strong hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2">
         <Icon name="arrow_back" className="text-[18px] group-hover:-translate-x-0.5 transition-transform" /> Retour
       </button>
 
       {/* En-tête agent (vert) */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-700 to-brand-600 p-5 shadow-card flex items-center gap-4 flex-wrap">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-700 to-brand-600 p-5 shadow-card flex items-center gap-4">
         <span className="absolute -right-8 -top-10 w-40 h-40 rounded-full bg-white/5" aria-hidden="true" />
         <span className="relative rounded-full ring-2 ring-or-400/80 ring-offset-2 ring-offset-brand-700 shrink-0">
           <Avatar src={photoDe(id)} name={e.name} size="w-14 h-14" textSize="text-lg" ring={false} />
@@ -177,128 +229,31 @@ export default function Pointages() {
           <h1 className="text-xl font-semibold text-white leading-tight truncate">{e.name}</h1>
           <p className="text-sm text-white/70 truncate">{e.fonction} · {e.id}</p>
         </div>
-        <div className="relative flex items-center gap-2 shrink-0">
-          <div className="text-right mr-1 hidden sm:block">
-            <p className="text-2xl font-bold text-white tabular-nums leading-none">{moyenne}%</p>
-            <p className="text-[11px] text-white/60">travail moyen · {periode.toLowerCase()}</p>
-          </div>
-          <Button variant="primary" icon="save" onClick={enregistrer}>Enregistrer</Button>
+      </div>
+
+      {/* Barre période : navigation + sélecteur */}
+      <div className="card p-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setRef((r) => decaler(periode, r, -1))} className="w-9 h-9 grid place-items-center rounded-lg border border-border text-muted hover:text-ink hover:bg-surface-2 transition-colors" aria-label="Période précédente"><Icon name="chevron_left" className="text-[20px]" /></button>
+          <p className="text-sm font-semibold text-ink min-w-[190px] text-center capitalize">{labelPeriode(periode, ref)}</p>
+          <button onClick={() => setRef((r) => decaler(periode, r, 1))} className="w-9 h-9 grid place-items-center rounded-lg border border-border text-muted hover:text-ink hover:bg-surface-2 transition-colors" aria-label="Période suivante"><Icon name="chevron_right" className="text-[20px]" /></button>
+          <button onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setRef(d); }} className="ml-1 px-2.5 h-9 rounded-lg border border-border text-xs font-medium text-muted hover:text-ink hover:bg-surface-2 transition-colors">Aujourd'hui</button>
+        </div>
+        <div className="inline-flex p-1 rounded-xl bg-surface-2 border border-border gap-1">
+          {PERIODES.map((p) => (
+            <button key={p} onClick={() => setPeriode(p)} aria-pressed={periode === p} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${periode === p ? "bg-surface text-brand-700 shadow-sm" : "text-muted hover:text-texte"}`}>{p}</button>
+          ))}
         </div>
       </div>
 
-      {/* Tableau */}
+      {/* Contenu */}
       <div className="card overflow-hidden">
-        <div className="px-4 sm:px-5 py-3 border-b border-border flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-muted inline-flex items-center gap-1.5">
-            <Icon name="edit_calendar" className="text-brand-600 text-[18px]" />
-            {periode === "Année" ? "Synthèse mensuelle — lecture seule." : "Modifiez librement les pointages — réservé à l'administrateur."}
-          </p>
-          {/* Filtre de période */}
-          <div className="inline-flex p-1 rounded-xl bg-surface-2 border border-border gap-1">
-            {PERIODES.map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriode(p)}
-                aria-pressed={periode === p}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:shadow-focus ${periode === p ? "bg-surface text-brand-700 shadow-sm" : "text-muted hover:text-texte"}`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {periode === "Année" ? (
-          /* ---- Synthèse mensuelle (lecture seule) ---- */
-          <div className="overflow-x-auto scroll-thin">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead>
-                <tr className="text-left text-xs text-subtle border-b border-border">
-                  <th className="px-5 py-3 font-medium">Mois</th>
-                  <th className="px-3 py-3 font-medium">Jours ouvrés</th>
-                  <th className="px-3 py-3 font-medium">Présences</th>
-                  <th className="px-3 py-3 font-medium">Retards</th>
-                  <th className="px-3 py-3 font-medium">Absences / congés</th>
-                  <th className="px-5 py-3 font-medium">Travail moyen</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {annee.map((m) => (
-                  <tr key={m.mois} className="hover:bg-surface-2/50">
-                    <td className="px-5 py-3 font-medium text-texte whitespace-nowrap">{m.nom}</td>
-                    <td className="px-3 py-3 text-muted tabular-nums">{m.jours}</td>
-                    <td className="px-3 py-3 tabular-nums"><span className="text-emerald-600 font-medium">{m.presents}</span></td>
-                    <td className="px-3 py-3 tabular-nums"><span className="text-amber-600 font-medium">{m.retards}</span></td>
-                    <td className="px-3 py-3 tabular-nums text-muted">{m.absents} / {m.conges}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="tabular-nums text-texte font-medium w-9">{m.moy}%</span>
-                        <span className="hidden md:block w-24 h-1.5 rounded-full bg-surface-2 overflow-hidden" aria-hidden="true">
-                          <span className="block h-full rounded-full bg-brand-500" style={{ width: `${m.moy}%` }} />
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          /* ---- Détail jour par jour (éditable) ---- */
-          <div className="overflow-x-auto scroll-thin">
-            <table className="w-full text-sm min-w-[660px]">
-              <thead>
-                <tr className="text-left text-xs text-subtle border-b border-border">
-                  <th className="px-5 py-3 font-medium">Date</th>
-                  <th className="px-3 py-3 font-medium">Arrivée</th>
-                  <th className="px-3 py-3 font-medium">Départ</th>
-                  <th className="px-3 py-3 font-medium">Heures</th>
-                  <th className="px-3 py-3 font-medium">Travail</th>
-                  <th className="px-5 py-3 font-medium">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {rows.map((r, i) => (
-                  <tr key={i} className="hover:bg-surface-2/50">
-                    <td className="px-5 py-2.5 font-medium text-texte whitespace-nowrap">{r.date}</td>
-                    <td className="px-3 py-2.5"><input value={r.arrivee} onChange={(ev) => maj(i, "arrivee", ev.target.value)} placeholder="--:--" className={champTime} aria-label={`Arrivée ${r.date}`} /></td>
-                    <td className="px-3 py-2.5"><input value={r.depart} onChange={(ev) => maj(i, "depart", ev.target.value)} placeholder="--:--" className={champTime} aria-label={`Départ ${r.date}`} /></td>
-                    <td className="px-3 py-2.5"><input value={r.temps} onChange={(ev) => maj(i, "temps", ev.target.value)} placeholder="—" className={`${champTime} w-[4.5rem]`} aria-label={`Heures ${r.date}`} /></td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <input type="number" min="0" max="100" value={r.pourcentage} onChange={(ev) => majPct(i, ev.target.value)} className="w-16 rounded-lg bg-canvas border border-border px-2 py-1 text-sm tabular-nums text-texte outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15" aria-label={`Pourcentage de travail ${r.date}`} />
-                        <span className="hidden md:block w-16 h-1.5 rounded-full bg-surface-2 overflow-hidden" aria-hidden="true">
-                          <span className="block h-full rounded-full bg-brand-500" style={{ width: `${r.pourcentage}%` }} />
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-2.5">
-                      <FilterSelect
-                        value={r.statut}
-                        onChange={(ev) => maj(i, "statut", ev.target.value)}
-                        className={`rounded-lg bg-canvas border border-border pl-2 py-1 font-medium focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 ${TONE_TXT[r.statut] ?? "text-texte"}`}
-                        aria-label={`Statut ${r.date}`}
-                      >
-                        {STATUTS.map((s) => (
-                          <option key={s} value={s} className="text-texte">{s}</option>
-                        ))}
-                      </FilterSelect>
-                    </td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-muted">Aucun pointage sur cette période.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="px-5 py-3.5 border-t border-border flex items-center justify-between gap-3">
-          <p className="text-[11px] text-faint flex items-center gap-1.5"><Icon name="lock" className="text-[14px]" /> Modifications réservées à l'administrateur.</p>
-          {periode !== "Année" && <Button variant="primary" icon="save" onClick={enregistrer}>Enregistrer les corrections</Button>}
-        </div>
+        {periode === "Année"
+          ? <SyntheseAnnee annee={annee} vide={!chargePointages && pointages.length === 0} />
+          : <TableJours rows={pointages} loading={chargePointages} onJour={ouvrir} />}
       </div>
+
+      <PointageJourModal employeId={e._id} jour={jourEdit} onClose={() => setJourEdit(null)} />
     </div>
   );
 }
