@@ -49,6 +49,8 @@ function mapPresence(rows) {
       arrivee: hhmm(p.heure_entree),
       depart: hhmm(p.heure_sortie),
       retardMin: Number(p.retard_minutes) || 0,
+      retardDejeunerMin: Number(p.retard_dejeuner_minutes) || 0,
+      tempsManquantMin: Number(p.temps_manquant_minutes) || 0,
       temps: dureeTexte(p.temps_present_minutes),
     }));
 }

@@ -24,6 +24,8 @@ export function mapEmploye(e) {
       prevu: "",
       arrivee: t.arrivee ? String(t.arrivee).slice(11, 16) : "--:--",
       retardMin: t.retard_minutes ?? null,
+      retardDejeunerMin: t.retard_dejeuner_minutes ?? null,
+      tempsManquantMin: t.temps_manquant_minutes ?? null,
       retenue: 0,
       statut: TODAY[t.statut] || (e.statut === "conge" ? "Congé" : "Absent"),
       poste: e.poste_libelle || "",

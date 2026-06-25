@@ -35,6 +35,7 @@ export default function CartePresence({ e, tr }) {
   const actif = live === "En activité";
   const arrivee = present && t.arrivee && t.arrivee !== "--:--" ? t.arrivee : "—";
   const retard = t.retardMin > 0 ? `+${t.retardMin} min` : "0 min";
+  const retardDej = t.retardDejeunerMin > 0 ? `+${t.retardDejeunerMin} min` : "0 min";
   const temps = present ? tempsTravaille(t.arrivee) : "—";
 
   return (
@@ -53,10 +54,11 @@ export default function CartePresence({ e, tr }) {
         <StatusPill label={live} tone={toneLive[live] ?? "slate"} />
       </div>
 
-      <div className="px-5 pb-4 grid grid-cols-2 gap-3 border-t border-border pt-4">
+      <div className="px-5 pb-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
         <Metrique icon="login" label="Arrivée" value={arrivee} tone="text-emerald-600" />
         <Metrique icon="logout" label="Départ" value={present ? "En cours" : "—"} />
         <Metrique icon="schedule" label="Retard" value={retard} tone={t.retardMin > 0 ? "text-rose-600" : "text-ink"} />
+        <Metrique icon="lunch_dining" label="Retard déj." value={retardDej} tone={t.retardDejeunerMin > 0 ? "text-rose-600" : "text-ink"} />
         <Metrique icon="timelapse" label="Temps travaillé" value={temps} />
       </div>
 
