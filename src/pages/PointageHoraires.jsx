@@ -162,7 +162,10 @@ export default function PointageHoraires() {
     return () => {
       actif = false;
     };
-  }, [matricule, dataVersion]);
+    // Le roster (résolution matricule -> id) est une liste quasi-statique : on ne la
+    // recharge PAS à chaque `dataVersion`. Les données vivantes (paie/calendrier) sont
+    // rafraîchies par l'effet ci-dessous, qui lui dépend bien de `dataVersion`.
+  }, [matricule]);
 
   const selectionne = employes.find((e) => e.matricule === selId) || null;
   const empNumId = selectionne?._id ?? null;

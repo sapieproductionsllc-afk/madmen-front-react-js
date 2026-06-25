@@ -103,7 +103,9 @@ export default function MonProfil() {
   const [form, setForm] = useState(base);
   const [photo, setPhoto] = useState(null);
   const fileRef = useRef(null);
-  const [twoFA, setTwoFA] = useState(true);
+  // 2FA : pas d'endpoint de gestion côté API -> état d'affichage figé (pas de
+  // bascule trompeuse). Le toggle informe que la fonctionnalité arrive bientôt.
+  const twoFA = true;
   const [mdpOuvert, setMdpOuvert] = useState(false);
   const [mdp, setMdp] = useState({ actuel: "", nouveau: "", confirme: "" });
 
@@ -155,8 +157,11 @@ export default function MonProfil() {
     const f = e.target.files?.[0];
     if (f) {
       if (photo) URL.revokeObjectURL(photo);
+      // Aperçu local uniquement : pas d'endpoint d'upload de photo de profil côté
+      // API -> on n'affirme PAS que c'est enregistré (le rechargement repartira
+      // de la photo serveur). Honnête : info, pas un faux succès.
       setPhoto(URL.createObjectURL(f));
-      toast("Photo de profil mise à jour", "success");
+      toast("Aperçu local — l'enregistrement de la photo n'est pas encore disponible.", "info");
     }
     e.target.value = "";
   };
@@ -171,10 +176,10 @@ export default function MonProfil() {
     const email = form.email.trim();
     if (!form.name.trim() || !email) return toast("Nom et e-mail requis", "error");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast("Adresse e-mail invalide", "error");
-    // Pas d'endpoint d'écriture /api/me pour l'instant : on met à jour l'affichage
-    // localement (le rechargement de page repartira des données serveur).
-    setProfil((p) => ({ ...p, name: form.name.trim(), email, telephone: form.telephone.trim() }));
-    toast("Profil mis à jour", "success");
+    // Pas d'endpoint d'écriture /api/me/profil côté API : on ne peut PAS persister
+    // ces changements. Message honnête (pas de faux succès), le formulaire reste
+    // tel quel pour que l'utilisateur sache que rien n'a été enregistré.
+    toast("Modification du profil bientôt disponible — contactez un administrateur.", "info");
   };
   const fermerMdp = () => { setMdpOuvert(false); setMdp({ actuel: "", nouveau: "", confirme: "" }); };
   const validerMdp = () => {
@@ -296,7 +301,7 @@ export default function MonProfil() {
                 <p className="text-sm font-medium text-texte">Double authentification (2FA)</p>
                 <p className="text-xs text-muted">{twoFA ? "Activée" : "Désactivée"} — sécurité renforcée</p>
               </div>
-              <Toggle checked={twoFA} onChange={(v) => { setTwoFA(v); toast(v ? "2FA activée" : "2FA désactivée", "info"); }} label="Double authentification" />
+              <Toggle checked={twoFA} onChange={() => toast("Gestion de la double authentification bientôt disponible.", "info")} label="Double authentification" />
             </div>
             <div className="flex items-center justify-between py-2 border-t border-border">
               <div className="min-w-0">

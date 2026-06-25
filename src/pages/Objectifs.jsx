@@ -156,7 +156,7 @@ function CarteObjectif({ objectif, onGerer, onSupprimer, empById = {} }) {
 export default function Objectifs() {
   const { toast, confirm } = useUI();
   const [objectifs, setObjectifs] = useState([]);
-  const [employes, setEmployes] = useState([]); // annuaire (sélection / partage) via /api/employes
+  const [employes, setEmployes] = useState([]); // annuaire léger (sélection / partage) via /api/employes?light=1
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
   const [cat, setCat] = useState("Tous");
@@ -165,7 +165,7 @@ export default function Objectifs() {
   useEffect(() => {
     setChargement(true);
     setErreur(null);
-    Promise.all([apiGet("/api/me/objectifs"), apiGet("/api/employes")])
+    Promise.all([apiGet("/api/me/objectifs"), apiGet("/api/employes?light=1")])
       .then(([objs, emps]) => {
         setObjectifs(Array.isArray(objs) ? objs.map(mapObjectif) : []);
         setEmployes(Array.isArray(emps) ? emps.map(mapEmploye) : []);

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import { apiGet, apiPost, apiUpload } from "../lib/api.js";
+import { apiGet, apiPost, apiUpload, apiDownload } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -24,7 +24,7 @@ const mapMessage = (m) => {
   const base = { de: m.mien ? "moi" : "lui", heure: heureDe(m.created_at) };
   if (m.type !== "texte" && m.fichier) {
     const ko = m.fichier.taille != null ? Math.max(1, Math.round(m.fichier.taille / 1024)) : null;
-    return { ...base, type: "document", nom: m.fichier.nom_original || "Document", taille: ko != null ? `${ko} Ko` : "—" };
+    return { ...base, type: "document", nom: m.fichier.nom_original || "Document", taille: ko != null ? `${ko} Ko` : "—", url: m.fichier.url || null };
   }
   return { ...base, texte: m.contenu ?? "" };
 };
@@ -49,7 +49,9 @@ export default function Messagerie({ embedded = false }) {
   useEffect(() => {
     setChargement(true);
     setErreur(null);
-    Promise.all([apiGet("/api/employes"), apiGet("/api/conversations")])
+    // Liste SLIM (?light) : la messagerie n'a besoin que de id/matricule/nom pour le rail
+    // des collègues et le décompte de diffusion — pas du pointage du jour ni des jointures.
+    Promise.all([apiGet("/api/employes?light=1"), apiGet("/api/conversations")])
       .then(([liste, convs]) => {
         setEmployes((liste ?? []).map(mapEmploye));
         setConversations(Array.isArray(convs) ? convs : []);
@@ -216,6 +218,18 @@ export default function Messagerie({ embedded = false }) {
   function onKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyer(); }
   }
+  // Téléchargement réel et authentifié d'une pièce jointe (url issue de l'API).
+  async function telecharger(m) {
+    if (!m?.url) {
+      toast("Pièce jointe indisponible.", "info");
+      return;
+    }
+    try {
+      await apiDownload(m.url, m.nom);
+    } catch (err) {
+      toast(err?.message || "Échec du téléchargement", "error");
+    }
+  }
 
   if (chargement) {
     return (
@@ -327,9 +341,10 @@ export default function Messagerie({ embedded = false }) {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => toast("Téléchargement du document…", "info")}
+                                onClick={() => telecharger(m)}
+                                disabled={!m.url}
                                 aria-label={`Télécharger ${m.nom}`}
-                                className={`ml-1 shrink-0 rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 ${moi ? "hover:bg-white/15 focus-visible:ring-white/60" : "hover:bg-black/5 focus-visible:ring-brand-600"}`}
+                                className={`ml-1 shrink-0 rounded p-0.5 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 ${moi ? "hover:bg-white/15 focus-visible:ring-white/60" : "hover:bg-black/5 focus-visible:ring-brand-600"}`}
                               >
                                 <Icon name="download" className="text-[18px]" />
                               </button>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -39,20 +39,44 @@ export default function Activite() {
   const [tempsReel, setTempsReel] = useState({});
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const [actualisation, setActualisation] = useState(false); // re-fetch manuel via « Actualiser »
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Tous");
 
-  // Données RÉELLES depuis l'API (remplace les mocks de src/data).
-  useEffect(() => {
-    apiGet("/api/presence/temps-reel")
+  // Re-fetch RÉEL de l'activité temps réel. Renvoie une promesse pour que le bouton
+  // « Actualiser » ne toaste le succès qu'APRÈS résolution (et l'erreur sur échec).
+  const charger = useCallback(() => {
+    setErreur(null);
+    return apiGet("/api/presence/temps-reel")
       .then((data) => {
         const { employes, tempsReel } = mapTempsReel(data);
         setEmployes(employes);
         setTempsReel(tempsReel);
       })
-      .catch((e) => setErreur(e.message || "Erreur de chargement"))
+      .catch((e) => {
+        setErreur(e.message || "Erreur de chargement");
+        throw e;
+      })
       .finally(() => setChargement(false));
   }, []);
+
+  // Données RÉELLES depuis l'API (remplace les mocks de src/data).
+  useEffect(() => {
+    charger().catch(() => {});
+  }, [charger]);
+
+  const actualiser = async () => {
+    if (actualisation) return;
+    setActualisation(true);
+    try {
+      await charger();
+      toast("Activité actualisée", "success");
+    } catch {
+      toast("Échec de l'actualisation de l'activité", "error");
+    } finally {
+      setActualisation(false);
+    }
+  };
 
   const liveDe = (e) => tempsReel[e.id]?.live ?? "Absent";
 
@@ -77,8 +101,8 @@ export default function Activite() {
   return (
     <div className="space-y-5 pb-12">
       <PageHeader title="Activité" subtitle="Activité des postes en temps réel.">
-        <Button variant="secondary" icon="refresh" onClick={() => toast("Activité actualisée", "success")}>
-          Actualiser
+        <Button variant="secondary" icon="refresh" onClick={actualiser} disabled={actualisation}>
+          {actualisation ? "Actualisation…" : "Actualiser"}
         </Button>
       </PageHeader>
 

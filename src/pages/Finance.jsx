@@ -8,7 +8,7 @@ import StatusPill from "../components/ui/StatusPill.jsx";
 import Modal from "../components/ui/Modal.jsx";
 import { Input, Select, Field } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet } from "../lib/api.js";
+import { apiGet, apiPost } from "../lib/api.js";
 
 // Devise officielle de l'app : FCFA. Format « 1 300 FCFA » (repris de datasets.js, ce n'est pas une donnée).
 const fcfa = (n) => Math.round(n).toLocaleString("fr-FR") + " FCFA";
@@ -53,6 +53,9 @@ function statutPaie(p) {
 function mapLignePaie(p) {
   const emp = p.employe || {};
   const id = emp.matricule ?? String(emp.id ?? "");
+  // `empId` = id numérique en base (requis par POST /api/paie/{employe_id}/payer
+  // et /api/paie/payer-lot, qui n'acceptent PAS le matricule).
+  const empId = Number(emp.id) || null;
   const name = (`${emp.prenom ?? ""} ${emp.nom ?? ""}`).trim() || emp.matricule || "—";
   const f = {
     base: Number(p.salaire_brut) || 0,
@@ -62,7 +65,7 @@ function mapLignePaie(p) {
     net: Number(p.salaire_net) || 0,
     status: statutPaie(p),
   };
-  return { e: { id, name, fonction: "" }, f };
+  return { e: { id, empId, name, fonction: "" }, f };
 }
 
 // Une dépense de /api/depenses -> mouvement « Dépense » attendu par MvtRow.
@@ -187,8 +190,18 @@ export default function Finance() {
     return lignesPaie.filter((l) => !t || l.e.name.toLowerCase().includes(t) || l.e.fonction.toLowerCase().includes(t));
   }, [q, lignesPaie]);
 
-  const marquerPayes = (ids) => {
+  // Marque payée la paie d'un lot d'agents via POST /api/paie/payer-lot (idempotent côté API),
+  // puis met à jour l'état LOCAL seulement après confirmation du serveur. Renvoie une promesse :
+  // les appelants toastent le succès uniquement après résolution, et l'erreur dans le catch.
+  const marquerPayes = async (ids) => {
     if (!ids.length) return;
+    // L'API attend les id numériques en base (employe_ids), pas les matricules (= l.e.id).
+    const empIds = ids
+      .map((id) => lignesPaie.find((x) => x.e.id === id)?.e.empId)
+      .filter((v) => Number.isFinite(v));
+    if (!empIds.length) throw new Error("Aucun agent valide à payer");
+    await apiPost("/api/paie/payer-lot", { employe_ids: empIds, periode: PERIODE_API });
+
     setAnnulables((a) => { const n = { ...a }; ids.forEach((id) => { if (!(id in n)) n[id] = statuts[id]; }); return n; });
     setStatuts((prev) => { const n = { ...prev }; ids.forEach((id) => (n[id] = "Payé")); return n; });
     setAjouts((prev) => [...ids.map((id) => { const l = lignesPaie.find((x) => x.e.id === id); return { id: `SAL-${id}-${ids.length}-${Object.keys(annulables).length}`, date: AUJ_ISO, type: "Salaire", libelle: l.e.name, employeId: id, montant: l.f.net }; }), ...prev]);
@@ -197,19 +210,26 @@ export default function Finance() {
   const payerTous = () => {
     const ids = nonPayes.map((l) => l.e.id);
     if (!ids.length) return toast("Tout le personnel est déjà payé.", "info");
-    confirm({ title: "Payer tout le personnel ?", message: `${ids.length} agents seront payés en une fois, pour un total de ${fcfa(totalAPayer)}.`, confirmLabel: "Tout payer", onConfirm: () => { marquerPayes(ids); toast(`${ids.length} paiements validés (${fcfa(totalAPayer)})`, "success"); } });
+    confirm({ title: "Payer tout le personnel ?", message: `${ids.length} agents seront payés en une fois, pour un total de ${fcfa(totalAPayer)}.`, confirmLabel: "Tout payer", onConfirm: async () => {
+      try { await marquerPayes(ids); toast(`${ids.length} paiements validés (${fcfa(totalAPayer)})`, "success"); }
+      catch (e) { toast(e?.message || "Échec du paiement", "error"); }
+    } });
   };
   const payerSelection = () => {
     if (!selValides.length) return;
-    confirm({ title: "Payer la sélection ?", message: `${selValides.length} agent(s) seront payés, pour un total de ${fcfa(totalSelection)}.`, confirmLabel: "Payer la sélection", onConfirm: () => { marquerPayes(selValides); toast(`${selValides.length} paiement(s) validé(s)`, "success"); } });
+    confirm({ title: "Payer la sélection ?", message: `${selValides.length} agent(s) seront payés, pour un total de ${fcfa(totalSelection)}.`, confirmLabel: "Payer la sélection", onConfirm: async () => {
+      try { await marquerPayes(selValides); toast(`${selValides.length} paiement(s) validé(s)`, "success"); }
+      catch (e) { toast(e?.message || "Échec du paiement", "error"); }
+    } });
   };
-  const payerUn = (l) => confirm({ title: "Valider ce paiement ?", message: `${l.e.name} — ${fcfa(l.f.net)} sera marqué comme payé.`, confirmLabel: "Valider", onConfirm: () => { marquerPayes([l.e.id]); toast(`Paiement de ${l.e.name} validé`, "success"); } });
-  const annuler = (l) => confirm({ title: "Annuler ce paiement ?", message: `Le paiement de ${l.e.name} (${fcfa(l.f.net)}) sera annulé et retiré du journal.`, confirmLabel: "Annuler le paiement", danger: true, onConfirm: () => {
-    setStatuts((prev) => ({ ...prev, [l.e.id]: annulables[l.e.id] ?? "En attente" }));
-    setAjouts((prev) => prev.filter((m) => !(m.type === "Salaire" && m.employeId === l.e.id)));
-    setAnnulables((a) => { const n = { ...a }; delete n[l.e.id]; return n; });
-    toast(`Paiement de ${l.e.name} annulé`, "info");
+  const payerUn = (l) => confirm({ title: "Valider ce paiement ?", message: `${l.e.name} — ${fcfa(l.f.net)} sera marqué comme payé.`, confirmLabel: "Valider", onConfirm: async () => {
+    try { await marquerPayes([l.e.id]); toast(`Paiement de ${l.e.name} validé`, "success"); }
+    catch (e) { toast(e?.message || "Échec du paiement", "error"); }
   } });
+  // Le paiement est persisté côté serveur (POST /api/paie/payer-lot) et l'API n'expose
+  // AUCUNE route pour l'annuler (pas de DELETE sur paie_paiement). On reste HONNÊTE :
+  // pas de faux succès ni de revert local (qui réapparaîtrait au rechargement).
+  const annuler = (l) => toast(`Annulation d'un paiement bientôt disponible — paiement de ${l.e.name} conservé.`, "info");
 
   const toggleSel = (id) => setSelection((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const idsSelectionnables = listePaie.filter((l) => statuts[l.e.id] !== "Payé").map((l) => l.e.id);
@@ -217,15 +237,20 @@ export default function Finance() {
   const partiel = !toutCoche && idsSelectionnables.some((id) => selection.has(id));
   const toutSelectionner = () => setSelection(() => (toutCoche ? new Set() : new Set(idsSelectionnables)));
 
-  const ajouterDepense = () => {
+  const ajouterDepense = async () => {
     const montant = Number(dMontant);
     if (!dLib.trim()) return toast("Renseignez le libellé", "info");
     if (!dDate) return toast("Renseignez la date", "info");
     if (dDate > AUJ_ISO) return toast("La date ne peut pas être dans le futur", "info");
     if (!montant || montant <= 0) return toast("Montant invalide", "info");
-    setAjouts((prev) => [{ id: `DEP-${dLib}-${montant}-${prev.length}`, date: dDate, type: "Dépense", libelle: dLib.trim(), categorie: dCat, montant }, ...prev]);
-    toast(`Dépense « ${dLib.trim()} » enregistrée`, "success");
-    setDepOuverte(false); setDLib(""); setDCat(CATEGORIES_DEP[0]); setDMontant(""); setDDate(AUJ_ISO);
+    try {
+      const cree = await apiPost("/api/depenses", { libelle: dLib.trim(), categorie: dCat, montant, date: dDate });
+      setAjouts((prev) => [mapDepenseMvt(cree), ...prev]);
+      toast(`Dépense « ${dLib.trim()} » enregistrée`, "success");
+      setDepOuverte(false); setDLib(""); setDCat(CATEGORIES_DEP[0]); setDMontant(""); setDDate(AUJ_ISO);
+    } catch (e) {
+      toast(e?.message || "Échec de l'enregistrement de la dépense", "error");
+    }
   };
 
   const KPIS = [

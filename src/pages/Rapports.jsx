@@ -6,7 +6,7 @@ import Avatar from "../components/ui/Avatar.jsx";
 import AreaChart from "../components/ui/AreaChart.jsx";
 import { FilterSelect } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet } from "../lib/api.js";
+import { apiGet, exportRapport } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/80?u=${encodeURIComponent(id)}`;
@@ -147,18 +147,24 @@ export default function Rapports() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
 
+  // Annuaire léger (départements du menu déroulant « service ») — liste STATIQUE :
+  // chargée une seule fois, pas re-fetchée à chaque changement de filtre.
+  useEffect(() => {
+    apiGet("/api/employes?light=1")
+      .then((emp) => setEmployes((Array.isArray(emp) ? emp : []).map(mapEmploye)))
+      .catch(() => setEmployes([]));
+  }, []);
+
   // Données RÉELLES depuis l'API (remplace les mocks de src/data).
   // Le filtre « service » est transmis à la synthèse ; on relance au changement.
-  // /api/employes alimente la liste des départements du menu déroulant « service ».
   useEffect(() => {
     setChargement(true);
     setErreur(null);
     const q = service && service !== "Tous services" ? `?service=${encodeURIComponent(service)}` : "";
-    Promise.all([apiGet(`/api/rapports/synthese${q}`), apiGet("/api/productivite/classement"), apiGet("/api/employes")])
-      .then(([synthese, clt, emp]) => {
+    Promise.all([apiGet(`/api/rapports/synthese${q}`), apiGet("/api/productivite/classement")])
+      .then(([synthese, clt]) => {
         setStats(mapSynthese(synthese));
         setClassement(mapClassement(clt));
-        setEmployes((Array.isArray(emp) ? emp : []).map(mapEmploye));
       })
       .catch((e) => setErreur(e.message || "Erreur de chargement"))
       .finally(() => setChargement(false));
@@ -170,6 +176,23 @@ export default function Rapports() {
 
   // Nombre d'agents affiché dans l'en-tête du classement.
   const nbAgents = useMemo(() => classement.length, [classement]);
+
+  // Export : ouvre la page HTML imprimable de l'API (PDF navigateur), avec le
+  // filtre « service » courant. Toast de succès UNIQUEMENT après résolution réelle.
+  const [exportEnCours, setExportEnCours] = useState(false);
+  async function exporter() {
+    if (exportEnCours) return;
+    setExportEnCours(true);
+    const q = service && service !== "Tous services" ? `?service=${encodeURIComponent(service)}` : "";
+    try {
+      await exportRapport(q);
+      toast("Rapport ouvert — Enregistrer en PDF depuis l'aperçu", "success");
+    } catch (e) {
+      toast(e?.message || "Export impossible — réessayez.", "error");
+    } finally {
+      setExportEnCours(false);
+    }
+  }
 
   const jauges = [
     { icon: "trending_up", label: "Productivité", sub: "Score moyen", center: `${stats.productivite}%`, value: stats.productivite, color: COL.emerald },
@@ -188,7 +211,7 @@ export default function Rapports() {
             <option key={s}>{s}</option>
           ))}
         </FilterSelect>
-        <Button icon="download" onClick={() => toast("Rapport exporté (PDF)", "info")}>Export</Button>
+        <Button icon="download" onClick={exporter} disabled={exportEnCours}>Export</Button>
       </PageHeader>
 
       {chargement ? (

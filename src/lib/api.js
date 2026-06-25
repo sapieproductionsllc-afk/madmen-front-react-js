@@ -103,6 +103,74 @@ export async function apiUpload(path, file, champ = "fichier", extra = null) {
   return data;
 }
 
+// Téléchargement authentifié d'un binaire (ex. pièce jointe /api/fichiers/{id}).
+// La route exige l'en-tête Bearer : un <a href> nu renverrait 403. On récupère donc
+// le blob avec le JWT puis on déclenche un téléchargement navigateur.
+export async function apiDownload(path, nomFichier) {
+  const headers = {};
+  const tok = getToken();
+  if (tok) headers.Authorization = `Bearer ${tok}`;
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, { method: "GET", headers });
+  } catch {
+    const err = new Error("Réseau indisponible — l'API est-elle démarrée ?");
+    err.network = true;
+    throw err;
+  }
+  if (res.status === 401) clearToken();
+  if (!res.ok) {
+    let msg = `Erreur HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      if (data && data.error) msg = data.error;
+    } catch {
+      /* ignore */
+    }
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  const blob = await res.blob();
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objUrl;
+  if (nomFichier) a.download = nomFichier;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Libère l'object URL après le déclenchement du téléchargement.
+  setTimeout(() => URL.revokeObjectURL(objUrl), 10000);
+}
+
+// GET /api/rapports/export -> page HTML imprimable (PDF navigateur). La réponse
+// n'est PAS du JSON et la route exige le JWT : on récupère le HTML avec l'en-tête
+// Authorization puis on l'ouvre via une URL blob (window.open nu ne peut pas poser
+// d'en-tête Bearer et serait rejeté en 401). `query` (optionnel) ex. "?service=Atelier".
+export async function exportRapport(query = "") {
+  const headers = {};
+  const tok = getToken();
+  if (tok) headers.Authorization = `Bearer ${tok}`;
+  let res;
+  try {
+    res = await fetch(`${BASE}/api/rapports/export${query}`, { method: "GET", headers });
+  } catch {
+    const err = new Error("Réseau indisponible — l'API est-elle démarrée ?");
+    err.network = true;
+    throw err;
+  }
+  if (res.status === 401) clearToken();
+  if (!res.ok) {
+    const err = new Error(`Erreur HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  const html = await res.text();
+  const objUrl = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  window.open(objUrl, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
+}
+
 export const authLogin = (matricule, codePin) =>
   request("POST", "/api/auth/login", { matricule, code_pin: codePin });
 export const authMe = () => request("GET", "/api/auth/me");

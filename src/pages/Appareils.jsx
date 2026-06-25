@@ -189,7 +189,7 @@ export default function Appareils({ embedded = false }) {
       <Button variant="secondary" icon="sync" onClick={synchroniserK40} disabled={syncK40}>
         {syncK40 ? "Synchro…" : "Synchroniser le K40"}
       </Button>
-      <Button variant="primary" icon="add" onClick={() => toast("Ajout d'appareil ouvert", "info")}>Ajouter un appareil</Button>
+      <Button variant="primary" icon="add" onClick={() => toast("Ajout d'appareil bientôt disponible.", "info")}>Ajouter un appareil</Button>
     </div>
   );
 
@@ -208,7 +208,7 @@ export default function Appareils({ embedded = false }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {appareils.map((a) => (
-            <CarteAppareil key={a.id} a={a} onSync={synchroniserK40} onConfig={(d) => toast(`Configuration de ${d.nom} ouverte`, "info")} />
+            <CarteAppareil key={a.id} a={a} onSync={synchroniserK40} onConfig={(d) => toast(`Configuration de ${d.nom} bientôt disponible.`, "info")} />
           ))}
         </div>
       )}

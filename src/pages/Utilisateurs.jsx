@@ -35,7 +35,7 @@ function mapRole(r) {
 }
 
 export default function Utilisateurs({ embedded = false }) {
-  const { confirm, toast } = useUI();
+  const { toast } = useUI();
 
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -53,14 +53,9 @@ export default function Utilisateurs({ embedded = false }) {
       .finally(() => setChargement(false));
   }, []);
 
+  // Aucune route backend de suspension d'accès n'existe -> action honnête (pas de faux succès).
   const suspendre = (u) =>
-    confirm({
-      title: "Suspendre cet accès ?",
-      message: `${u.name} ne pourra plus se connecter à la plateforme jusqu'à réactivation.`,
-      confirmLabel: "Suspendre l'accès",
-      danger: true,
-      onConfirm: () => toast(`Accès de ${u.name} suspendu`, "info"),
-    });
+    toast(`Suspension d'accès bientôt disponible (${u.name})`, "info");
 
   const colonnes = [
     {
@@ -93,7 +88,7 @@ export default function Utilisateurs({ embedded = false }) {
   ];
 
   const action = (
-    <Button icon="person_add" onClick={() => toast("Invitation d'utilisateur ouverte", "info")}>
+    <Button icon="person_add" onClick={() => toast("Invitation d'utilisateur bientôt disponible", "info")}>
       Inviter un utilisateur
     </Button>
   );

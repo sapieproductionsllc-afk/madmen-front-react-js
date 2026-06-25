@@ -89,7 +89,7 @@ export default function Productivite() {
   return (
     <div>
       <PageHeader title="Productivité" subtitle="Temps réellement travaillé, taux et classement des employés.">
-        <Button variant="secondary" icon="download" onClick={() => toast("Rapport de productivité exporté")}>
+        <Button variant="secondary" icon="download" onClick={() => toast("Export de productivité bientôt disponible", "info")}>
           Exporter
         </Button>
       </PageHeader>

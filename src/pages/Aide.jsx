@@ -104,8 +104,8 @@ export default function Aide() {
             </div>
           </div>
           <div className="flex gap-2 shrink-0">
-            <Button variant="secondary" icon="menu_book" onClick={() => toast("Documentation ouverte (PDF)", "info")}>Documentation</Button>
-            <Button variant="primary" icon="mail" onClick={() => toast("Demande envoyée au support", "success")}>Contacter le support</Button>
+            <Button variant="secondary" icon="menu_book" onClick={() => toast("Documentation bientôt disponible.", "info")}>Documentation</Button>
+            <Button variant="primary" icon="mail" onClick={() => { window.location.href = "mailto:support@madmen.io"; }}>Contacter le support</Button>
           </div>
         </div>
       </section>

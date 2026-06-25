@@ -118,7 +118,10 @@ export default function Demandes({ embedded = false }) {
     const decision = DECISION_API[statut];
     const idApi = cible?._id; // id numérique requis par l'API
     if (!decision || idApi == null) {
-      return toast(`Demande ${statut === "Approuvée" ? "approuvée" : "refusée"}.`, statut === "Approuvée" ? "success" : "info");
+      // Pas d'id serveur (ligne provisoire pas encore persistée) : on ne peut PAS
+      // enregistrer la décision -> rollback + message honnête, jamais de faux succès.
+      setListe((prev) => prev.map((d) => (d.id === id ? { ...d, statut: ancien } : d)));
+      return toast("Demande non encore enregistrée — réessayez dans un instant.", "info");
     }
     try {
       await apiPost(`/api/demandes/${idApi}/decision`, { decision });

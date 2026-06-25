@@ -9,7 +9,7 @@ import SalaireFixe from "../components/salaire/SalaireFixe.jsx";
 import { Input, Field } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
 import { fcfa } from "../data/datasets.js";
-import { apiGet } from "../lib/api.js";
+import { apiGet, apiPost } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
 const champMontant =
@@ -72,44 +72,54 @@ export default function Paiement() {
   const [live, setLive] = useState("Absent"); // l'API /api/paie n'expose pas de statut temps réel
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
-  const [empId, setEmpId] = useState(null); // id NUMÉRIQUE (pour les endpoints salaire)
+  const [empId, setEmpId] = useState(null); // id NUMÉRIQUE (pour les endpoints salaire/paie/prêts)
   const [tick, setTick] = useState(0); // recharge le bulletin après modif du salaire fixe
 
   // Composition du salaire (modifiable) + avances en cours (dette) + statut.
   const [compo, setCompo] = useState({ base: 0, primes: 0, retenues: 0 });
   const [avances, setAvances] = useState(0);
+  const [prets, setPrets] = useState([]); // prêts EN COURS de l'employé (pour régler/solder)
   const [statut, setStatut] = useState("En attente");
   const [mouvement, setMouvement] = useState("");
+  const [enCours, setEnCours] = useState(false); // verrou anti-double-clic des actions
+
+  const moisCourant = new Date().toISOString().slice(0, 7); // AAAA-MM
 
   useEffect(() => {
     let actif = true;
     setChargement(true);
     setErreur(null);
 
+    // Paie RAPIDE : on ne tire QUE cet employé (statut live inclus dans `today`) + son
+    // bulletin du mois (qui porte déjà avances/primes/retenues), EN PARALLÈLE. Plus de
+    // liste complète employés ni de paie globale. Les endpoints acceptent le matricule.
     Promise.all([
-      apiGet("/api/employes"),
-      apiGet("/api/paie"),
-      apiGet("/api/prets").catch(() => null), // avances : optionnel si l'endpoint est absent
+      apiGet(`/api/employes/${id}`),
+      apiGet(`/api/employes/${id}/paie?mois=${moisCourant}`).catch(() => null),
     ])
-      .then(([employesData, paieData, pretsData]) => {
+      .then(async ([employeApi, bulletin]) => {
         if (!actif) return;
 
-        const agentApi = (Array.isArray(employesData) ? employesData : []).find((x) => x.matricule === id);
-        const agent = agentApi ? mapEmploye(agentApi) : null;
-
-        const liste = Array.isArray(paieData?.paie) ? paieData.paie : [];
-        const bulletin = liste.find((b) => b?.employe?.matricule === id) || null;
+        const agent = employeApi ? mapEmploye(employeApi) : null;
+        const numId = employeApi?.id ?? null;
         const paie = mapPaie(bulletin);
 
-        // Avances = somme des mensualités des prêts en cours de l'employé (repli : bulletin).
+        // Prêts EN COURS de l'employé : source des avances + base de régler/solder.
+        // Requiert l'id NUMÉRIQUE (que l'on vient d'obtenir) -> appel séquentiel léger.
+        let pretsEnCours = [];
         let totalAvances = paie.avances;
-        if (Array.isArray(pretsData) && agentApi) {
-          const empId = agentApi.id;
-          const somme = pretsData
-            .filter((p) => p && p.employe_id === empId && p.statut === "en_cours")
-            .reduce((s, p) => s + (Number(p.mensualite) || 0), 0);
-          if (pretsData.some((p) => p && p.employe_id === empId)) totalAvances = somme;
+        if (numId != null) {
+          try {
+            const liste = await apiGet(`/api/prets?employe_id=${numId}&statut=en_cours`);
+            if (Array.isArray(liste)) {
+              pretsEnCours = liste;
+              totalAvances = liste.reduce((s, p) => s + (Number(p.mensualite) || 0), 0);
+            }
+          } catch {
+            /* endpoint indisponible -> on garde l'avance du bulletin */
+          }
         }
+        if (!actif) return;
 
         // Historique des paiements : l'API n'expose pas l'historique multi-mois ici,
         // on présente le bulletin du mois courant (vide si pas de paie).
@@ -117,12 +127,13 @@ export default function Paiement() {
           ? [{ mois: paie.moisLabel || "Mois en cours", net: paie.net, status: paie.status }]
           : [];
 
-        setEmpId(agentApi?.id ?? null);
+        setEmpId(numId);
         setE(agent);
         setBase(paie);
         setPaiements(histo);
         setCompo({ base: paie.base, primes: paie.primes, retenues: paie.retenues });
         setAvances(totalAvances);
+        setPrets(pretsEnCours);
         setStatut(paie.status === "Payé" ? "Payé" : "En attente");
       })
       .catch((err) => {
@@ -135,7 +146,7 @@ export default function Paiement() {
     return () => {
       actif = false;
     };
-  }, [id, tick]);
+  }, [id, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (chargement) {
     return (
@@ -175,29 +186,89 @@ export default function Paiement() {
 
   const majCompo = (champ, val) => setCompo((c) => ({ ...c, [champ]: Math.max(0, Number(val) || 0) }));
 
-  const donnerAvance = () => {
+  // Accorde une avance = crée un prêt (mensualité = montant : déduit en une fois du net).
+  const donnerAvance = async () => {
     const m = Number(mouvement);
     if (!m || m <= 0) return toast("Saisissez un montant valide.", "info");
-    setAvances((a) => a + m);
-    setMouvement("");
-    toast(`Avance de ${fcfa(m)} versée à ${e.name}. Sera déduite du salaire.`, "success");
+    if (empId == null) return toast("Employé indisponible.", "error");
+    if (enCours) return;
+    setEnCours(true);
+    try {
+      const pret = await apiPost("/api/prets", { employe_id: empId, montant: m, mensualite: m });
+      setPrets((ps) => [pret, ...ps]);
+      setAvances((a) => a + (Number(pret?.mensualite) || m));
+      setMouvement("");
+      toast(`Avance de ${fcfa(m)} versée à ${e.name}. Sera déduite du salaire.`, "success");
+    } catch (err) {
+      toast(err?.message || "Échec de l'enregistrement de l'avance.", "error");
+    } finally {
+      setEnCours(false);
+    }
   };
-  const reglerDette = () => {
+  // Règle une partie de la dette = remboursement imputé sur les prêts en cours (du + ancien au + récent).
+  const reglerDette = async () => {
     const m = Number(mouvement);
     if (!m || m <= 0) return toast("Saisissez un montant valide.", "info");
-    if (!avances) return toast("Aucune dette en cours.", "info");
-    setAvances((a) => Math.max(0, a - m));
-    setMouvement("");
-    toast(`Dette réduite de ${fcfa(m)}.`, "success");
+    if (!prets.length) return toast("Aucune dette en cours.", "info");
+    if (enCours) return;
+    setEnCours(true);
+    try {
+      let reste = m;
+      let liste = [...prets];
+      // Imputer du prêt le plus ancien (fin de liste) vers le plus récent.
+      for (let i = liste.length - 1; i >= 0 && reste > 0; i--) {
+        const p = liste[i];
+        const solde = Number(p.solde) || 0;
+        if (solde <= 0) continue;
+        const verse = Math.min(reste, solde);
+        const maj = await apiPost(`/api/prets/${p.id}/remboursement`, { montant: verse });
+        liste[i] = maj;
+        reste -= verse;
+      }
+      const encore = liste.filter((p) => p.statut === "en_cours");
+      setPrets(encore);
+      setAvances(encore.reduce((s, p) => s + (Number(p.mensualite) || 0), 0));
+      setMouvement("");
+      toast(`Dette réduite de ${fcfa(m - reste)}.`, "success");
+    } catch (err) {
+      toast(err?.message || "Échec du remboursement.", "error");
+    } finally {
+      setEnCours(false);
+    }
   };
-  const solder = () => {
-    if (!avances) return toast("Aucune dette en cours.", "info");
-    setAvances(0);
-    toast("Dette entièrement soldée.", "success");
+  // Solde entièrement la dette = rembourse le solde de chaque prêt en cours.
+  const solder = async () => {
+    if (!prets.length) return toast("Aucune dette en cours.", "info");
+    if (enCours) return;
+    setEnCours(true);
+    try {
+      for (const p of prets) {
+        const solde = Number(p.solde) || 0;
+        if (solde > 0) await apiPost(`/api/prets/${p.id}/remboursement`, { montant: solde });
+      }
+      setPrets([]);
+      setAvances(0);
+      toast("Dette entièrement soldée.", "success");
+    } catch (err) {
+      toast(err?.message || "Échec du soldé de la dette.", "error");
+    } finally {
+      setEnCours(false);
+    }
   };
-  const payer = () => {
-    setStatut("Payé");
-    toast(`Net de ${fcfa(net)} versé à ${e.name}.`, "success");
+  // Marque la paie du mois comme payée (journal Finance) — montant = net calculé.
+  const payer = async () => {
+    if (empId == null) return toast("Employé indisponible.", "error");
+    if (statut === "Payé" || enCours) return;
+    setEnCours(true);
+    try {
+      await apiPost(`/api/paie/${empId}/payer`, { periode: moisCourant, montant: net });
+      setStatut("Payé");
+      toast(`Net de ${fcfa(net)} versé à ${e.name}.`, "success");
+    } catch (err) {
+      toast(err?.message || "Échec du paiement.", "error");
+    } finally {
+      setEnCours(false);
+    }
   };
 
   const lignes = [
@@ -244,7 +315,7 @@ export default function Paiement() {
             <Icon name={statut === "Payé" ? "check_circle" : "schedule"} className="text-[14px]" filled />
             {statut}
           </span>
-          <Button variant="primary" icon="check_circle" onClick={payer} disabled={statut === "Payé"}>
+          <Button variant="primary" icon="check_circle" onClick={payer} disabled={statut === "Payé" || enCours}>
             {statut === "Payé" ? "Déjà payé" : "Marquer comme payé"}
           </Button>
         </div>
@@ -293,13 +364,13 @@ export default function Paiement() {
             <Field label="Montant (FCFA)" className="flex-1">
               <Input type="number" min="0" value={mouvement} onChange={(ev) => setMouvement(ev.target.value)} placeholder="ex. 50000" />
             </Field>
-            <Button variant="brand" icon="add_card" onClick={donnerAvance}>Donner</Button>
-            <Button variant="secondary" icon="undo" onClick={reglerDette}>Régler</Button>
+            <Button variant="brand" icon="add_card" onClick={donnerAvance} disabled={enCours}>Donner</Button>
+            <Button variant="secondary" icon="undo" onClick={reglerDette} disabled={enCours || !prets.length}>Régler</Button>
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-2">
             <p className="text-[11px] text-faint flex items-center gap-1.5"><Icon name="lock" className="text-[14px]" /> Réservé à l'administrateur.</p>
-            <button onClick={solder} className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-40" disabled={!avances}>
+            <button onClick={solder} className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-40" disabled={!prets.length || enCours}>
               Solder la dette
             </button>
           </div>

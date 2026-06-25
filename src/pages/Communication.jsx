@@ -6,7 +6,7 @@ import StatusPill from "../components/ui/StatusPill.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
 import { Input, Select, Field, champClass } from "../components/ui/Input.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet, apiPost, apiUpload } from "../lib/api.js";
+import { apiGet, apiPost, apiUpload, apiDownload } from "../lib/api.js";
 import { mapEmploye } from "../lib/mappers.js";
 
 const photoDe = (id) => `https://i.pravatar.cc/120?u=${encodeURIComponent(id)}`;
@@ -24,7 +24,7 @@ const mapMessage = (m) => {
   const base = { de: m.mien ? "moi" : "lui", heure: heureDe(m.created_at) };
   if (m.type !== "texte" && m.fichier) {
     const ko = m.fichier.taille != null ? Math.max(1, Math.round(m.fichier.taille / 1024)) : null;
-    return { ...base, type: "document", nom: m.fichier.nom_original || "Document", taille: ko != null ? `${ko} Ko` : "—" };
+    return { ...base, type: "document", nom: m.fichier.nom_original || "Document", taille: ko != null ? `${ko} Ko` : "—", url: m.fichier.url || null };
   }
   return { ...base, texte: m.contenu ?? "" };
 };
@@ -256,6 +256,19 @@ export default function Communication() {
     }
   }
 
+  // Téléchargement réel et authentifié d'une pièce jointe (url issue de l'API).
+  async function telecharger(m) {
+    if (!m?.url) {
+      toast("Pièce jointe indisponible.", "info");
+      return;
+    }
+    try {
+      await apiDownload(m.url, m.nom);
+    } catch (err) {
+      toast(err?.message || "Échec du téléchargement", "error");
+    }
+  }
+
   useEffect(() => {
     finFilRef.current?.scrollIntoView({ block: "end" });
   }, [sel, messages.length]);
@@ -437,7 +450,7 @@ export default function Communication() {
                             <div className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 max-w-[78%] ${bulle}`}>
                               <Icon name="description" className="text-[24px] shrink-0" filled />
                               <div className="min-w-0"><p className="text-sm font-medium truncate">{m.nom}</p><p className={`text-[11px] ${moi ? "text-white/85" : "text-subtle"}`}>{m.taille}</p></div>
-                              <button type="button" onClick={() => toast("Téléchargement du document…", "info")} aria-label={`Télécharger ${m.nom}`} className={`ml-1 shrink-0 rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 ${moi ? "hover:bg-white/15 focus-visible:ring-white/60" : "hover:bg-black/5 focus-visible:ring-brand-600"}`}><Icon name="download" className="text-[18px]" /></button>
+                              <button type="button" onClick={() => telecharger(m)} disabled={!m.url} aria-label={`Télécharger ${m.nom}`} className={`ml-1 shrink-0 rounded p-0.5 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 ${moi ? "hover:bg-white/15 focus-visible:ring-white/60" : "hover:bg-black/5 focus-visible:ring-brand-600"}`}><Icon name="download" className="text-[18px]" /></button>
                             </div>
                           ) : (
                             <div className={`rounded-2xl px-3.5 py-2 max-w-[75%] text-sm leading-relaxed ${bulle}`}>{m.texte}</div>

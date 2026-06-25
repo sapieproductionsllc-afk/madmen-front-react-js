@@ -8,7 +8,7 @@ import Icon from "../components/ui/Icon.jsx";
 import Drawer from "../components/ui/Drawer.jsx";
 import Avatar from "../components/ui/Avatar.jsx";
 import { useUI } from "../components/ui/UIProvider.jsx";
-import { apiGet } from "../lib/api.js";
+import { apiGet, apiPost } from "../lib/api.js";
 
 const config = {
   Critique: { tone: "rose", icon: "gpp_bad", chip: "bg-rose-50 text-rose-700", bar: "bg-rose-500", rang: 0 },
@@ -86,14 +86,25 @@ export default function Alertes() {
       .finally(() => setChargement(false));
   }, []);
 
-  const marquerLu = (a) => {
-    setLues((s) => new Set(s).add(a.id));
-    toast("Alerte marquée comme lue", "info");
+  const marquerLu = async (a) => {
+    if (lues.has(a.id)) return;
+    try {
+      await apiPost(`/api/alertes/${a.id}/lu`);
+      setLues((s) => new Set(s).add(a.id));
+      toast("Alerte marquée comme lue", "info");
+    } catch (e) {
+      toast(e.message || "Impossible de marquer l'alerte comme lue", "error");
+    }
   };
 
-  const toutMarquer = () => {
-    setLues(new Set(donnees.map((a) => a.id)));
-    toast("Toutes les alertes ont été marquées comme lues");
+  const toutMarquer = async () => {
+    try {
+      await apiPost("/api/alertes/tout-lire");
+      setLues(new Set(donnees.map((a) => a.id)));
+      toast("Toutes les alertes ont été marquées comme lues");
+    } catch (e) {
+      toast(e.message || "Impossible de marquer les alertes comme lues", "error");
+    }
   };
 
   const nonLues = donnees.filter((a) => !lues.has(a.id)).length;

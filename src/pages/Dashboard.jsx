@@ -90,9 +90,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (!employes.length) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
     setErreur(null);
-    // Présence (compteurs + agents[]) + productivité globale (KPI productivité).
-    Promise.all([apiGet("/api/dashboard/presence"), apiGet("/api/productivite/global")])
-      .then(([presence]) => {
+    // Présence (compteurs + agents[]) — seule source consommée par cette vue.
+    apiGet("/api/dashboard/presence")
+      .then((presence) => {
         setEmployes((presence?.agents ?? []).map(mapAgentDashboard));
       })
       .catch((e) => setErreur(e?.message || "Erreur de chargement"))

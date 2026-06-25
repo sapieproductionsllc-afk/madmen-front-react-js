@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import SearchInput from "../components/ui/SearchInput.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -55,15 +55,41 @@ export default function Presence() {
   const [employes, setEmployes] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const [actualisation, setActualisation] = useState(false); // re-fetch manuel via « Actualiser »
+
+  // Re-fetch RÉEL des présences. Renvoie une promesse pour que le bouton « Actualiser »
+  // puisse n'afficher le toast de succès qu'APRÈS résolution (et un toast d'erreur sur échec).
+  const charger = useCallback(() => {
+    setEmployes((prev) => {
+      if (!prev.length) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
+      return prev;
+    });
+    setErreur(null);
+    return apiGet("/api/dashboard/presence")
+      .then((data) => setEmployes((data?.agents ?? []).map(mapAgentPresence)))
+      .catch((e) => {
+        setErreur(e?.message || "Erreur de chargement");
+        throw e;
+      })
+      .finally(() => setChargement(false));
+  }, []);
 
   useEffect(() => {
-    if (!employes.length) setChargement(true); // spinner seulement au 1er chargement ; refresh = silencieux
-    setErreur(null);
-    apiGet("/api/dashboard/presence")
-      .then((data) => setEmployes((data?.agents ?? []).map(mapAgentPresence)))
-      .catch((e) => setErreur(e?.message || "Erreur de chargement"))
-      .finally(() => setChargement(false));
-  }, [dataVersion]);
+    charger().catch(() => {});
+  }, [charger, dataVersion]);
+
+  const actualiser = async () => {
+    if (actualisation) return;
+    setActualisation(true);
+    try {
+      await charger();
+      toast("Présences actualisées", "success");
+    } catch {
+      toast("Échec de l'actualisation des présences", "error");
+    } finally {
+      setActualisation(false);
+    }
+  };
 
   const compte = (k) => employes.filter(cats.find((c) => c.key === k).test).length;
 
@@ -78,8 +104,8 @@ export default function Presence() {
   return (
     <div className="space-y-5 pb-12">
       <PageHeader title="Présence" subtitle="Suivi des présences en temps réel.">
-        <Button variant="secondary" icon="refresh" onClick={() => toast("Présences actualisées", "success")}>
-          Actualiser
+        <Button variant="secondary" icon="refresh" onClick={actualiser} disabled={actualisation}>
+          {actualisation ? "Actualisation…" : "Actualiser"}
         </Button>
       </PageHeader>
 
