@@ -205,54 +205,48 @@ export default function ProfilDetails() {
     setErreur(null);
     setDetail(VIDE);
 
-    // 1) Résolution matricule -> id numérique via la liste, + options des selects.
-    Promise.all([apiGet("/api/employes"), apiGet("/api/dashboard/presence")])
-      .then(async ([employesData, presence]) => {
-        const liste = Array.isArray(employesData) ? employesData : [];
-        const empApi = liste.find((x) => x.matricule === id);
-        if (!empApi) {
-          if (actif) { setE(null); setEmp(null); setChargement(false); }
+    // Profil détaillé RAPIDE : employé COMPLET (par matricule, statut live dans `today`)
+    // + référentiels EN PARALLÈLE. Liste LÉGÈRE (?light) seulement pour le picker « supérieur ».
+    Promise.all([
+      apiGet(`/api/employes/${id}`),
+      apiGet("/api/postes").catch(() => null),
+      apiGet("/api/departements").catch(() => null),
+      apiGet("/api/employes?light=1").catch(() => []),
+    ])
+      .then(([complet, postes, departements, liste]) => {
+        if (!actif) return null;
+        if (!complet || typeof complet !== "object" || !complet.id) {
+          setE(null); setEmp(null); setChargement(false);
           return null;
         }
-        const nid = empApi.id;
-
-        // Options selects : postes + départements + responsables.
-        const postes = await apiGet("/api/postes").catch(() => null);
-        const departements = await apiGet("/api/departements").catch(() => null);
-        const optionsPostes = Array.isArray(postes) && postes.length
+        const nid = complet.id;
+        const ls = Array.isArray(liste) ? liste : [];
+        const optionsPostes = Array.isArray(postes)
           ? postes.map((p) => ({ value: String(p.id), label: p.nom || p.intitule || p.code || `Poste ${p.id}` }))
-          : deriverOptions(liste, "poste_id", "poste_libelle");
-        const optionsDeps = Array.isArray(departements) && departements.length
+          : [];
+        const optionsDeps = Array.isArray(departements)
           ? departements.map((d) => ({ value: String(d.id), label: d.nom || d.libelle || `Département ${d.id}` }))
-          : deriverOptions(liste, "departement_id", "departement_nom");
-        const optionsSup = liste
+          : [];
+        const optionsSup = ls
           .filter((x) => x.id !== nid)
           .map((x) => ({ value: String(x.id), label: x.name || `${x.prenom ?? ""} ${x.nom ?? ""}`.trim() || x.matricule }))
           .sort((a, b) => a.label.localeCompare(b.label));
 
-        // 2) Employé COMPLET (tous les champs, incl. les 7 nouveaux) via GET /api/employes/{id}.
-        const complet = await apiGet(`/api/employes/${nid}`).catch(() => empApi);
-        const source = complet && typeof complet === "object" ? complet : empApi;
+        setNumericId(nid);
+        setEmp(complet);
+        setE(mapEmploye(complet));
+        const st = complet.today?.statut ?? null;
+        setLive(st ? STATUT_LIVE[st] ?? "Absent" : "Absent");
+        setOpts({ postes: optionsPostes, departements: optionsDeps, superieurs: optionsSup });
 
-        const ag = (presence?.agents ?? []).find((a) => a.matricule === id || a.id === nid);
-
-        if (actif) {
-          setNumericId(nid);
-          setEmp(source);
-          setE(mapEmploye(source));
-          setLive(ag ? STATUT_LIVE[ag.statut] ?? "Absent" : "Absent");
-          setOpts({ postes: optionsPostes, departements: optionsDeps, superieurs: optionsSup });
-        }
-
-        // 3) Sous-ressources Activité / Historique (INCHANGÉES). Documents gérés par <DocumentsSection>.
+        // Sous-ressources Activité / Historique (inchangées) ; Documents via <DocumentsSection>.
         const jour = aujourdHui();
         return Promise.all([
           apiGet(`/api/employes/${nid}/historique-rh`).catch(() => []),
           apiGet(`/api/sessions?employe_id=${nid}`).catch(() => []),
           apiGet(`/api/incidents?employe_id=${nid}&from=${jour}&to=${jour}`).catch(() => []),
         ]).then(([histo, sessions, incidents]) => {
-          if (!actif) return;
-          setDetail(construireDetail(histo, sessions, incidents, jour));
+          if (actif) setDetail(construireDetail(histo, sessions, incidents, jour));
         });
       })
       .catch((err) => {

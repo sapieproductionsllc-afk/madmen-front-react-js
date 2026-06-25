@@ -42,7 +42,7 @@ export default function MenuBurgerProfil({ e }) {
   const [bio, setBio] = useState(false);
   const [badge, setBadge] = useState(false);
   const [pin, setPin] = useState(null); // code PIN régénéré à afficher
-  const [confirmSusp, setConfirmSusp] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // null | 'actif' | 'suspendu' | 'archive'
   const [statut, setStatut] = useState(e?.statut ?? "actif");
 
   const btnRef = useRef(null);
@@ -84,19 +84,28 @@ export default function MenuBurgerProfil({ e }) {
     }
   };
 
+  const archived = statut === "archive";
   const suspendu = statut === "suspendu";
-  const basculerStatut = async () => {
-    if (!id) return;
-    const nouveau = suspendu ? "actif" : "suspendu";
+  const changerStatut = async () => {
+    if (!id || !confirmAction) return;
+    const cible = confirmAction;
     try {
-      await apiPut(`/api/employes/${id}`, { statut: nouveau });
-      setStatut(nouveau);
-      setConfirmSusp(false);
-      toast(nouveau === "suspendu" ? `${e?.name} suspendu(e)` : `${e?.name} réactivé(e)`, "success");
+      await apiPut(`/api/employes/${id}`, { statut: cible });
+      setStatut(cible);
+      setConfirmAction(null);
+      toast(cible === "actif" ? `${e?.name} réactivé(e)` : cible === "suspendu" ? `${e?.name} suspendu(e)` : `${e?.name} archivé(e)`, "success");
     } catch {
       toast("Changement de statut impossible", "error");
     }
   };
+
+  // Config du modal de confirmation selon l'action ciblée.
+  const CONF = {
+    actif: { titre: "Réactiver l'employé ?", icon: "play_circle", tone: "emerald", btn: "Réactiver", variant: "primary", texte: `${e?.name} pourra de nouveau pointer et se connecter.` },
+    suspendu: { titre: "Suspendre l'employé ?", icon: "pause_circle", tone: "danger", btn: "Suspendre", variant: "danger", texte: `${e?.name} ne pourra plus pointer ni se connecter. Ses données sont conservées.` },
+    archive: { titre: "Archiver l'employé ?", icon: "inventory_2", tone: "danger", btn: "Archiver", variant: "danger", texte: `${e?.name} sera retiré(e) des effectifs actifs (masqué des listes). Données et historique conservés.` },
+  };
+  const conf = confirmAction ? CONF[confirmAction] : null;
 
   return (
     <>
@@ -124,12 +133,14 @@ export default function MenuBurgerProfil({ e }) {
           <Item icon="badge" label="Badge RFID" onClick={() => { setOpen(false); setBadge(true); }} />
           <Item icon="password" label="Régénérer le PIN" onClick={regenererPin} />
           <div className="h-px bg-border my-1.5 mx-2" />
-          <Item
-            icon={suspendu ? "play_circle" : "pause_circle"}
-            label={suspendu ? "Réactiver l'employé" : "Suspendre l'employé"}
-            danger={!suspendu}
-            onClick={() => { setOpen(false); setConfirmSusp(true); }}
-          />
+          {archived ? (
+            <Item icon="play_circle" label="Réactiver l'employé" onClick={() => { setOpen(false); setConfirmAction("actif"); }} />
+          ) : (
+            <>
+              <Item icon={suspendu ? "play_circle" : "pause_circle"} label={suspendu ? "Réactiver l'employé" : "Suspendre l'employé"} danger={!suspendu} onClick={() => { setOpen(false); setConfirmAction(suspendu ? "actif" : "suspendu"); }} />
+              <Item icon="inventory_2" label="Archiver l'employé" danger onClick={() => { setOpen(false); setConfirmAction("archive"); }} />
+            </>
+          )}
         </div>
       )}
 
@@ -149,23 +160,19 @@ export default function MenuBurgerProfil({ e }) {
       </Modal>
 
       <Modal
-        open={confirmSusp}
-        onClose={() => setConfirmSusp(false)}
-        title={suspendu ? "Réactiver l'employé ?" : "Suspendre l'employé ?"}
-        icon={suspendu ? "play_circle" : "pause_circle"}
-        iconTone={suspendu ? "emerald" : "danger"}
+        open={!!conf}
+        onClose={() => setConfirmAction(null)}
+        title={conf?.titre}
+        icon={conf?.icon}
+        iconTone={conf?.tone}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setConfirmSusp(false)}>Annuler</Button>
-            <Button variant={suspendu ? "primary" : "danger"} onClick={basculerStatut}>{suspendu ? "Réactiver" : "Suspendre"}</Button>
+            <Button variant="ghost" onClick={() => setConfirmAction(null)}>Annuler</Button>
+            <Button variant={conf?.variant} onClick={changerStatut}>{conf?.btn}</Button>
           </>
         }
       >
-        <p className="text-sm text-muted">
-          {suspendu
-            ? `${e?.name} pourra de nouveau pointer et se connecter.`
-            : `${e?.name} ne pourra plus pointer ni se connecter. Ses données et son historique sont conservés.`}
-        </p>
+        <p className="text-sm text-muted">{conf?.texte}</p>
       </Modal>
     </>
   );
