@@ -16,9 +16,9 @@ import { mapEmploye } from "../lib/mappers.js";
 const toneLive = { "En activité": "emerald", "En pause": "amber", Absent: "rose", Congé: "sky" };
 const ordreLive = { "En activité": 0, "En pause": 1, Absent: 2, Congé: 3 };
 
-// API statut (present/retard/absent/conge) -> statut live attendu par le JSX.
-// L'API n'expose pas de notion de « pause » : aucun agent ne tombera dans "En pause".
-const STATUT_LIVE = { present: "En activité", retard: "En activité", absent: "Absent", conge: "Congé", parti: "Parti" };
+// API statut (present/retard/pause/absent/conge/parti) -> statut live attendu par le JSX.
+// 'pause' = ressorti pendant la pause déjeuner (calculé par DashboardController::presence).
+const STATUT_LIVE = { present: "En activité", retard: "En activité", pause: "En pause", absent: "Absent", conge: "Congé", parti: "Parti" };
 
 // Construit l'employé (forme attendue par le JSX / CarteAgent) + son temps réel
 // à partir d'un agent renvoyé par /api/dashboard/presence (agents[]).
