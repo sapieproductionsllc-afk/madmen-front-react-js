@@ -13,12 +13,38 @@ import { mapEmploye } from "../lib/mappers.js";
 
 // Constantes de design (reprises des anciens mocks `datasets.js`, ce ne sont pas des données) :
 // statut live -> tonalité de badge, et ordre d'affichage des statuts.
-const toneLive = { "En activité": "emerald", "En pause": "amber", Absent: "rose", Congé: "sky" };
-const ordreLive = { "En activité": 0, "En pause": 1, Absent: 2, Congé: 3 };
+const toneLive = {
+  "En activité": "emerald",
+  "En pause": "amber",
+  "Pas revenu de pause": "or",        // sorti en pause, en retard de retour (suivi visuel)
+  "Jamais revenu de pause": "rose",   // pause non revenue, avant la fin de journée
+  Parti: "slate",
+  Absent: "rose",
+  Congé: "sky",
+};
+const ordreLive = {
+  "En activité": 0,
+  "En pause": 1,
+  "Pas revenu de pause": 2,
+  "Jamais revenu de pause": 3,
+  Parti: 4,
+  Absent: 5,
+  Congé: 6,
+};
 
-// API statut (present/retard/pause/absent/conge/parti) -> statut live attendu par le JSX.
-// 'pause' = ressorti pendant la pause déjeuner (calculé par DashboardController::presence).
-const STATUT_LIVE = { present: "En activité", retard: "En activité", pause: "En pause", absent: "Absent", conge: "Congé", parti: "Parti" };
+// API statut -> libellé live affiché. Les libellés "pas/jamais revenu de pause" sont des
+// repères VISUELS de suivi (calculés par DashboardController::presence) ; ils n'affectent
+// ni le retard du rapport ni la paie.
+const STATUT_LIVE = {
+  present: "En activité",
+  retard: "En activité",
+  pause: "En pause",
+  pas_revenu_pause: "Pas revenu de pause",
+  jamais_revenu_pause: "Jamais revenu de pause",
+  parti: "Parti",
+  absent: "Absent",
+  conge: "Congé",
+};
 
 // Construit l'employé (forme attendue par le JSX / CarteAgent) + son temps réel
 // à partir d'un agent renvoyé par /api/dashboard/presence (agents[]).
@@ -41,7 +67,7 @@ function mapAgentDashboard(a) {
   };
 }
 
-const statuts = ["Tous les statuts", "En activité", "En pause", "Parti", "Absent", "Congé"];
+const statuts = ["Tous les statuts", "En activité", "En pause", "Pas revenu de pause", "Jamais revenu de pause", "Parti", "Absent", "Congé"];
 
 const tonesPastille = {
   brand: "bg-brand-50 text-brand-600",
