@@ -49,16 +49,39 @@ function mapPointage(p) {
   const statut = STATUT_API[p.statut] || "Absent";
   const d = p.date ? new Date(p.date + "T00:00:00") : null;
   const ret = Number(p.retard_minutes) || 0;
+  // Mouvements = TOUS les passages du jour (entrées/sorties) ; repli sur arrivée+départ
+  // pour les jours qui n'ont que check_in/check_out (anciens pointages sans passages).
+  const passagesRaw = Array.isArray(p.passages) ? p.passages : [];
+  const mouvements = passagesRaw.length
+    ? passagesRaw
+    : [
+        ...(p.heure_entree ? [{ type: "entree", heure: heure(p.heure_entree) }] : []),
+        ...(p.heure_sortie ? [{ type: "sortie", heure: heure(p.heure_sortie) }] : []),
+      ];
   return {
     rawDate: p.date,
     mois: d ? d.getMonth() : 0,
     dateLabel: d ? `${JOURS_AB[(d.getDay() + 6) % 7]} ${d.getDate()} ${MOIS_AB[d.getMonth()]}` : "—",
     arrivee: heure(p.heure_entree),
     depart: heure(p.heure_sortie),
+    mouvements,
     temps: dureeHm(p.temps_present_minutes),
     retard: ret > 0 ? `+${ret} min` : "—",
     statut,
   };
+}
+
+// Chip d'un pointage : vert = entrée (on arrive), rouge = sortie (on part).
+function MvtChip({ m }) {
+  const inn = m.type === "entree";
+  return (
+    <span
+      title={inn ? "Entrée" : "Sortie"}
+      className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-bold tabular-nums ${inn ? "bg-emerald-500/15 text-emerald-700" : "bg-rose-500/15 text-rose-700"}`}
+    >
+      <Icon name={inn ? "login" : "logout"} className="text-[13px]" /> {m.heure}
+    </span>
+  );
 }
 
 function Centre({ icon, spin, rose, texte, retour }) {
@@ -90,8 +113,7 @@ function TableJours({ rows, loading, onJour }) {
           <thead>
             <tr className="text-left text-xs text-subtle border-b border-border">
               <th className="px-5 py-3 font-medium">Date</th>
-              <th className="px-3 py-3 font-medium">Arrivée</th>
-              <th className="px-3 py-3 font-medium">Départ</th>
+              <th className="px-3 py-3 font-medium">Mouvements <span className="font-normal normal-case text-faint">· entrées / sorties</span></th>
               <th className="px-3 py-3 font-medium">Heures</th>
               <th className="px-3 py-3 font-medium">Retard</th>
               <th className="px-5 py-3 font-medium">Statut</th>
@@ -101,18 +123,25 @@ function TableJours({ rows, loading, onJour }) {
             {rows.map((r) => (
               <tr key={r.rawDate} onClick={() => onJour(r)} className="hover:bg-surface-2/60 cursor-pointer transition-colors">
                 <td className="px-5 py-2.5 font-medium text-texte whitespace-nowrap capitalize">{r.dateLabel}</td>
-                <td className="px-3 py-2.5 font-mono tabular-nums text-texte">{r.arrivee}</td>
-                <td className="px-3 py-2.5 font-mono tabular-nums text-texte">{r.depart}</td>
+                <td className="px-3 py-2.5">
+                  {r.mouvements.length === 0 ? (
+                    <span className="text-muted">—</span>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {r.mouvements.map((m, i) => <MvtChip key={i} m={m} />)}
+                    </div>
+                  )}
+                </td>
                 <td className="px-3 py-2.5 tabular-nums text-muted">{r.temps}</td>
                 <td className={`px-3 py-2.5 tabular-nums ${r.retard !== "—" ? "text-amber-600 font-medium" : "text-muted"}`}>{r.retard}</td>
                 <td className="px-5 py-2.5"><StatutBadge statut={r.statut} /></td>
               </tr>
             ))}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-muted">Aucun pointage sur cette période.</td></tr>
+              <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-muted">Aucun pointage sur cette période.</td></tr>
             )}
             {loading && rows.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-10 text-center"><Icon name="progress_activity" className="animate-spin text-[22px] text-brand-600" /></td></tr>
+              <tr><td colSpan={5} className="px-5 py-10 text-center"><Icon name="progress_activity" className="animate-spin text-[22px] text-brand-600" /></td></tr>
             )}
           </tbody>
         </table>

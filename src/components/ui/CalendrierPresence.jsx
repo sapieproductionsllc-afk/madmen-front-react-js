@@ -31,6 +31,17 @@ function Punch({ p, compact = false }) {
   );
 }
 
+// Journal des pointages du jour : la liste complète des passages si dispo, sinon
+// repli sur l'arrivée + le départ (jours qui n'ont que check_in/check_out).
+function journal(j) {
+  const passages = Array.isArray(j.passages) ? j.passages : [];
+  if (passages.length > 0) return passages;
+  const log = [];
+  if (j.arrivee) log.push({ type: "entree", heure: j.arrivee });
+  if (j.depart) log.push({ type: "sortie", heure: j.depart });
+  return log;
+}
+
 function libelleJour(j) {
   return j.ferie ?? j.event ?? (j.today && !j.etat ? "aujourd'hui" : j.etat === "Prévu" ? "à pointer" : j.etat ?? "repos");
 }
@@ -38,7 +49,7 @@ function libelleJour(j) {
 // Cellule de jour (grille desktop) — en-tête (numéro + état) puis JOURNAL des pointages.
 function Cellule({ j, onJour }) {
   const st = ETAT[j.etat];
-  const passages = Array.isArray(j.passages) ? j.passages : [];
+  const passages = journal(j);
   const bg = j.ferie ? "bg-rose-50/70" : j.event ? "bg-sky-50/70" : st ? st.bg : j.today ? "bg-or-50" : j.weekend ? "bg-surface-2/40" : "bg-surface-2/20";
   const bordL = st ? st.bord : j.ferie ? "border-rose-400" : j.event ? "border-sky-400" : j.today ? "border-or-400" : "border-transparent";
   const num = st ? st.num : j.today ? "text-or-700" : j.weekend ? "text-subtle" : "text-muted";
@@ -91,7 +102,7 @@ function Cellule({ j, onJour }) {
 // Ligne de jour (liste mobile) — état + journal compact des pointages.
 function LigneJour({ j, onJour }) {
   const st = ETAT[j.etat];
-  const passages = Array.isArray(j.passages) ? j.passages : [];
+  const passages = journal(j);
   const bl = j.today ? "border-l-or-500 bg-or-50" : j.ferie ? "border-l-rose-500 bg-rose-50/50" : j.event ? "border-l-sky-500 bg-sky-50/50" : st ? `${st.bord.replace("border-", "border-l-")} ${st.bg}` : "border-l-border";
   const libelle = j.ferie ?? j.event ?? (j.today && !j.etat ? "Aujourd'hui" : j.etat === "Prévu" ? "À pointer" : j.etat ?? "—");
   return (
