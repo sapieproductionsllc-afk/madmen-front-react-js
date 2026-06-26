@@ -118,7 +118,7 @@ Cible : **un seul `.msi` Tauri** (« MadMen Admin ») qu'on installe sur le PC d
 | À embarquer | État | Note |
 |---|---|---|
 | Dashboard (React) + coque Tauri 2 | ✅ scaffold fait (`src-tauri/`) | `npm run tauri:build` → `.msi` |
-| `zkagent.exe` + `libzkfpcsharp.dll` (agent empreintes) | ✅ en **sidecar** (`externalBin`) | ⚠️ l'auto-lancement par l'app ne marche pas encore (bug spawn dev — à finir : garder le `CommandChild` en vie) ; en attendant on lance l'agent à la main |
+| `zkagent.exe` + `libzkfpcsharp.dll` (agent empreintes) | ✅ en **sidecar** (`externalBin`) | ✅ auto-lancement corrigé (2026-06-26) : `fingerprint.rs` garde le `CommandChild` dans l'état managé Tauri → l'agent reste vivant sur :8080. Plus besoin de le lancer à la main après un rebuild. |
 | **SDK ZKTeco** (`libzkfp.dll` + driver USB Live20) | ⛔ **à faire** (Task 7) | embarquer l'installeur SDK + post-install silencieuse (NSIS hook PowerShell) |
 | Passerelle K40 (parle au K40, push gabarits) | ⛔ **dépend encore de PHP local + Python pyzk** | objectif : **réécrire en Rust** dans Tauri (plan Task 5/6) pour ne plus dépendre de PHP/Python. En attendant, il faut PHP+MySQL+Python sur la machine |
 | Auto-start + tray | ✅ prévu (plugin autostart) | tray/hide-on-close = Task 2 à finir |
