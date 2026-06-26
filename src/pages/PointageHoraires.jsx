@@ -77,6 +77,7 @@ function construireCalendrier(paie) {
     let arrivee = null;
     let depart = null;
     let retardMin = 0;
+    let passages = []; // tous les pointages du jour : [{ type:'entree'|'sortie', heure:'HH:MM' }]
     let event = conge ? "Congé" : null;
 
     if (cours && !conge) {
@@ -85,6 +86,7 @@ function construireCalendrier(paie) {
         if (det.status === "PRESENT" || det.status === "LATE") {
           arrivee = hhmm(det.check_in);
           depart = hhmm(det.check_out);
+          passages = Array.isArray(det.passages) ? det.passages : [];
           retardMin = Math.round((Number(det.late_seconds) || 0) / 60);
         }
       } else if (futur) {
@@ -94,7 +96,7 @@ function construireCalendrier(paie) {
       }
     }
 
-    jours.push({ jour: d, dow, weekend, ferie, event, cours, futur, today: d === todayJour, etat, arrivee, depart, retardMin });
+    jours.push({ jour: d, dow, weekend, ferie, event, cours, futur, today: d === todayJour, etat, arrivee, depart, passages, retardMin });
   }
 
   return {
